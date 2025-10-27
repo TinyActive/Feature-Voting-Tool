@@ -1,0 +1,59 @@
+{
+  "app": {
+    "title": "Feature Voting",
+    "tagline": "Vote for the features you want to see"
+  },
+  "nav": {
+    "home": "Home",
+    "admin": "Admin"
+  },
+  "features": {
+    "title": "Features",
+    "noFeatures": "No features yet. Check back soon!",
+    "voteUp": "Upvote",
+    "voteDown": "Downvote",
+    "votes": "votes",
+    "loading": "Loading features...",
+    "error": "Failed to load features",
+    "browse": "Browse Features",
+    "total": "Features",
+    "totalVotes": "Total Votes"
+  },
+  "vote": {
+    "success": "Vote recorded!",
+    "error": "Failed to vote. Please try again.",
+    "rateLimit": "You're voting too fast. Please wait a moment."
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "login": "Login",
+    "logout": "Logout",
+    "token": "Admin Token",
+    "loginButton": "Sign In",
+    "stats": {
+      "title": "Statistics",
+      "totalFeatures": "Total Features",
+      "totalVotes": "Total Votes",
+      "topFeature": "Top Feature"
+    },
+    "features": {
+      "title": "Manage Features",
+      "add": "Add Feature",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "titleEn": "Title (English)",
+      "titleVi": "Title (Vietnamese)",
+      "descEn": "Description (English)",
+      "descVi": "Description (Vietnamese)",
+      "required": "This field is required"
+    }
+  },
+  "language": {
+    "en": "English",
+    "vi": "Tiếng Việt"
+  }
+}

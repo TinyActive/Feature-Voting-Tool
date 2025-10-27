@@ -1,0 +1,59 @@
+{
+  "app": {
+    "title": "Bình chọn tính năng",
+    "tagline": "Bình chọn cho các tính năng bạn muốn thấy"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "admin": "Quản trị"
+  },
+  "features": {
+    "title": "Tính năng",
+    "noFeatures": "Chưa có tính năng nào. Hãy quay lại sau!",
+    "voteUp": "Ủng hộ",
+    "voteDown": "Không ủng hộ",
+    "votes": "phiếu",
+    "loading": "Đang tải tính năng...",
+    "error": "Không thể tải tính năng",
+    "browse": "Duyệt tính năng",
+    "total": "Tính năng",
+    "totalVotes": "Tổng phiếu bầu"
+  },
+  "vote": {
+    "success": "Đã ghi nhận phiếu bầu!",
+    "error": "Không thể bình chọn. Vui lòng thử lại.",
+    "rateLimit": "Bạn đang bình chọn quá nhanh. Vui lòng đợi một chút."
+  },
+  "admin": {
+    "title": "Bảng điều khiển quản trị",
+    "login": "Đăng nhập",
+    "logout": "Đăng xuất",
+    "token": "Mã quản trị",
+    "loginButton": "Đăng nhập",
+    "stats": {
+      "title": "Thống kê",
+      "totalFeatures": "Tổng tính năng",
+      "totalVotes": "Tổng phiếu bầu",
+      "topFeature": "Tính năng hàng đầu"
+    },
+    "features": {
+      "title": "Quản lý tính năng",
+      "add": "Thêm tính năng",
+      "edit": "Sửa",
+      "delete": "Xóa",
+      "save": "Lưu",
+      "cancel": "Hủy"
+    },
+    "form": {
+      "titleEn": "Tiêu đề (Tiếng Anh)",
+      "titleVi": "Tiêu đề (Tiếng Việt)",
+      "descEn": "Mô tả (Tiếng Anh)",
+      "descVi": "Mô tả (Tiếng Việt)",
+      "required": "Trường này là bắt buộc"
+    }
+  },
+  "language": {
+    "en": "English",
+    "vi": "Tiếng Việt"
+  }
+}
