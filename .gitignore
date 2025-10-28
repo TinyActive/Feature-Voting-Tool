@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+dist/
+build/
+backend/
+.output/
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.dev.vars
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Wrangler
+.wrangler/
+.mf/
+
+# Build info
+.cache/
+.parcel-cache/
+
+
+# Local D1 database
+local-db.sqlite3
+# Local Cloudflare Workers site
+worker-site/
+# Local Cloudflare Workers KV
+worker-kv/
+# Local Cloudflare Workers D1
+worker-d1/
+# Local Cloudflare Workers Durable Objects
+worker-do/
+# Local Cloudflare Workers R2
+worker-r2/
+
+.cursor/

@@ -1,0 +1,47 @@
+name = "feature-voting-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# D1 Database binding - ID will be set from environment
+[[d1_databases]]
+binding = "DB"
+database_name = "feature-voting-db"
+database_id = "${CF_D1_DATABASE_ID}"
+
+# KV namespace for rate limiting - ID will be set from environment
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "${CF_KV_NAMESPACE_ID}"
+
+# Environment variables (non-sensitive)
+[vars]
+APP_URL = "https://idea.nginxwaf.me"
+
+# Secrets (NEVER commit these - set via wrangler secret put or GitHub Secrets)
+# ADMIN_TOKEN - Admin authentication token
+# TELEGRAM_BOT_TOKEN - Telegram bot token for notifications
+# TELEGRAM_CHAT_ID - Telegram chat ID for notifications
+# RESEND_API_KEY - Resend email service API key
+
+[build]
+command = "npm install && npx tsc"
+
+# Routes - apply to all environments
+routes = [
+  { pattern = "api.idea.nginxwaf.me/*", zone_name = "idea.nginxwaf.me" }
+]
+
+# Production environment
+[env.production]
+[env.production.vars]
+APP_URL = "https://idea.nginxwaf.me"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
