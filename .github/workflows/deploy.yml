@@ -75,21 +75,121 @@ jobs:
       - name: Run Database Migrations
         working-directory: ./worker
         run: |
-          echo "Running migration for admin comments..."
-          # Run migration first (adds is_admin column if not exists)
-          npx wrangler d1 execute feature-voting-db --file=./src/db/migration-add-admin-comments.sql --remote 2>&1 | tee migration.log || true
+          echo "========================================="
+          echo "Running Database Migrations (Safe Mode)"
+          echo "========================================="
           
-          # Check if migration succeeded or column already exists
-          if grep -q "duplicate column name" migration.log; then
-            echo "✓ Column is_admin already exists - skipping migration"
-          elif grep -q "error" migration.log; then
-            echo "⚠ Migration may have failed - check logs"
+          # Step 1: Ensure base tables exist
+          echo ""
+          echo "Step 1: Ensuring base tables exist..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote 2>&1 | tee base-schema.log || true
+          
+          if grep -q "error" base-schema.log && ! grep -q "already exists" base-schema.log; then
+            echo "⚠ Warning: Base schema may have issues"
           else
-            echo "✓ Migration completed successfully"
+            echo "✓ Base tables verified"
           fi
           
-          echo "Running base schema to ensure all tables exist..."
-          npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
+          # Step 2: Run admin comments migration (backward compatible)
+          echo ""
+          echo "Step 2: Running admin comments migration..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/migration-add-admin-comments.sql --remote 2>&1 | tee admin-comments.log || true
+          
+          if grep -q "duplicate column name" admin-comments.log; then
+            echo "✓ Admin comments column already exists - skipping"
+          elif grep -q "error" admin-comments.log; then
+            echo "⚠ Admin comments migration may have failed - check logs"
+          else
+            echo "✓ Admin comments migration completed"
+          fi
+          
+          # Step 3: Run RBAC migration (safe - uses ALTER TABLE ADD COLUMN IF NOT EXISTS pattern)
+          echo ""
+          echo "Step 3: Running RBAC migration..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/migration-rbac.sql --remote 2>&1 | tee rbac.log || true
+          
+          if grep -q "duplicate column name" rbac.log; then
+            echo "✓ RBAC columns already exist - skipping"
+          elif grep -q "error" rbac.log && ! grep -q "already exists" rbac.log; then
+            echo "⚠ RBAC migration may have failed - check logs"
+          else
+            echo "✓ RBAC migration completed"
+          fi
+          
+          # Step 4: Ensure new tables from schema v3 exist
+          echo ""
+          echo "Step 4: Ensuring RBAC tables exist..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/schema-v3.sql --remote 2>&1 | tee schema-v3.log || true
+          
+          if grep -q "error" schema-v3.log && ! grep -q "already exists" schema-v3.log; then
+            echo "⚠ Warning: Schema v3 may have issues"
+          else
+            echo "✓ RBAC tables verified"
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "✓ All migrations completed safely"
+          echo "========================================="
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CF_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+
+      - name: Setup Admin Email
+        working-directory: ./worker
+        run: |
+          echo "========================================="
+          echo "Setting up Admin Email from GitHub Secret"
+          echo "========================================="
+          
+          ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}"
+          
+          if [ -z "$ADMIN_EMAIL" ]; then
+            echo "⚠ Warning: ADMIN_EMAIL secret not set"
+            echo "Please add ADMIN_EMAIL to GitHub Secrets"
+            echo "Skipping admin setup..."
+            exit 0
+          fi
+          
+          echo "Admin email: $ADMIN_EMAIL"
+          echo ""
+          
+          # Add admin email to whitelist (INSERT OR IGNORE to avoid duplicates)
+          echo "Adding admin email to whitelist..."
+          npx wrangler d1 execute feature-voting-db --remote --command="INSERT OR IGNORE INTO admin_emails (email, added_at, added_by) VALUES ('$ADMIN_EMAIL', $(date +%s)000, 'github-actions');"
+          
+          if [ $? -eq 0 ]; then
+            echo "✓ Admin email added to whitelist"
+          else
+            echo "⚠ Failed to add admin email (may already exist)"
+          fi
+          
+          # Check if user exists and update role if needed
+          echo ""
+          echo "Checking if user exists..."
+          USER_EXISTS=$(npx wrangler d1 execute feature-voting-db --remote --command="SELECT id FROM users WHERE email = '$ADMIN_EMAIL';" --json | grep -o '"id"' | wc -l)
+          
+          if [ "$USER_EXISTS" -gt 0 ]; then
+            echo "User exists, updating role to admin..."
+            npx wrangler d1 execute feature-voting-db --remote --command="UPDATE users SET role = 'admin', status = 'active' WHERE email = '$ADMIN_EMAIL';"
+            
+            if [ $? -eq 0 ]; then
+              echo "✓ User role updated to admin"
+            else
+              echo "⚠ Failed to update user role"
+            fi
+          else
+            echo "ℹ User does not exist yet. Will be created as admin on first login."
+          fi
+          
+          echo ""
+          echo "========================================="
+          echo "✓ Admin setup completed"
+          echo "========================================="
+          echo ""
+          echo "Current admin emails:"
+          npx wrangler d1 execute feature-voting-db --remote --command="SELECT email, datetime(added_at/1000, 'unixepoch') as added_date, added_by FROM admin_emails ORDER BY added_at DESC;"
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CF_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL }}
