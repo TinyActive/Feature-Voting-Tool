@@ -67,11 +67,8 @@ CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
 CREATE INDEX IF NOT EXISTS idx_comments_created ON comments(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_comments_is_admin ON comments(is_admin);
 
--- Update votes table to track user votes
--- First, drop the existing votes table if it exists
-DROP TABLE IF EXISTS votes;
-
-CREATE TABLE votes (
+-- Votes table (DO NOT DROP - preserves existing data)
+CREATE TABLE IF NOT EXISTS votes (
   id TEXT PRIMARY KEY,
   feature_id TEXT NOT NULL,
   user_id TEXT, -- nullable for anonymous votes (legacy)
