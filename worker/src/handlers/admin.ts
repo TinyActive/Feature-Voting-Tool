@@ -7,7 +7,7 @@ import {
   deleteFeature,
 } from '../db/queries'
 import { corsHeaders } from '../utils/cors'
-import { verifyAdminToken, deleteAllUserSessions } from '../middleware/auth'
+import { verifyAdminToken } from '../middleware/auth'
 import { sendTelegramNotification } from '../utils/telegram'
 import { verifyRecaptcha } from '../utils/recaptcha'
 
@@ -148,21 +148,20 @@ export async function handleAdminStats(request: Request, env: Env): Promise<Resp
 }
 
 /**
- * Verify admin token and logout all user sessions
+ * Verify admin token (legacy endpoint for backward compatibility)
  * POST /api/admin/verify
  * Headers: Authorization: Bearer <admin_token>
+ * 
+ * Note: This endpoint is deprecated. Use email-based admin authentication instead.
  */
 export async function handleAdminVerify(request: Request, env: Env): Promise<Response> {
   const authError = verifyAdmin(request, env)
   if (authError) return authError
 
   try {
-    // Delete all user sessions when admin logs in
-    await deleteAllUserSessions(env)
-
     return jsonResponse({
       success: true,
-      message: 'Admin verified, all user sessions cleared',
+      message: 'Admin verified (legacy endpoint)',
     })
   } catch (error: any) {
     console.error('Admin verify error:', error)

@@ -2,12 +2,15 @@ import { Env } from '../index'
 import { corsHeaders } from '../utils/cors'
 import { sendEmail, generateMagicLinkEmail } from '../utils/email'
 import { verifyRecaptcha } from '../utils/recaptcha'
+import { isAdminEmail, UserRole } from '../middleware/auth'
 
 interface User {
   id: string
   email: string
   name: string | null
   avatar_url: string | null
+  role: UserRole
+  status: string
   created_at: number
   last_login_at: number | null
 }
@@ -51,6 +54,13 @@ export async function handleLoginRequest(request: Request, env: Env): Promise<Re
     let user = await getUserByEmail(env, email)
     if (!user) {
       user = await createUser(env, email)
+    } else {
+      // Check if user should be admin and update role if needed
+      const shouldBeAdmin = await isAdminEmail(email, env)
+      if (shouldBeAdmin && user.role !== 'admin') {
+        await updateUserRole(env, user.id, 'admin')
+        user.role = 'admin'
+      }
     }
 
     // Create session token
@@ -135,6 +145,8 @@ export async function handleVerifyToken(request: Request, env: Env): Promise<Res
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
+        status: user.status,
       },
       token: session.token,
     }), {
@@ -188,6 +200,8 @@ export async function handleGetCurrentUser(request: Request, env: Env): Promise<
         email: user.email,
         name: user.name,
         avatar_url: user.avatar_url,
+        role: user.role,
+        status: user.status,
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -253,6 +267,8 @@ async function getUserByEmail(env: Env, email: string): Promise<User | null> {
     email: result.email as string,
     name: result.name as string | null,
     avatar_url: result.avatar_url as string | null,
+    role: (result.role as UserRole) || 'user',
+    status: (result.status as string) || 'active',
     created_at: result.created_at as number,
     last_login_at: result.last_login_at as number | null,
   }
@@ -270,6 +286,8 @@ async function getUserById(env: Env, id: string): Promise<User | null> {
     email: result.email as string,
     name: result.name as string | null,
     avatar_url: result.avatar_url as string | null,
+    role: (result.role as UserRole) || 'user',
+    status: (result.status as string) || 'active',
     created_at: result.created_at as number,
     last_login_at: result.last_login_at as number | null,
   }
@@ -278,17 +296,23 @@ async function getUserById(env: Env, id: string): Promise<User | null> {
 async function createUser(env: Env, email: string): Promise<User> {
   const id = crypto.randomUUID()
   const now = Date.now()
+  
+  // Check if email should be admin
+  const shouldBeAdmin = await isAdminEmail(email, env)
+  const role = shouldBeAdmin ? 'admin' : 'user'
 
   await env.DB.prepare(`
-    INSERT INTO users (id, email, created_at)
-    VALUES (?, ?, ?)
-  `).bind(id, email, now).run()
+    INSERT INTO users (id, email, role, status, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(id, email, role, 'active', now).run()
 
   return {
     id,
     email,
     name: null,
     avatar_url: null,
+    role,
+    status: 'active',
     created_at: now,
     last_login_at: null,
   }
@@ -339,6 +363,12 @@ async function deleteSession(env: Env, id: string): Promise<void> {
 async function updateLastLogin(env: Env, userId: string): Promise<void> {
   await env.DB.prepare('UPDATE users SET last_login_at = ? WHERE id = ?')
     .bind(Date.now(), userId)
+    .run()
+}
+
+async function updateUserRole(env: Env, userId: string, role: UserRole): Promise<void> {
+  await env.DB.prepare('UPDATE users SET role = ? WHERE id = ?')
+    .bind(role, userId)
     .run()
 }
 
