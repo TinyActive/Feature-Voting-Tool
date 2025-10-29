@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -euo pipefail
 # Setup Admin Script
 # This script helps you set up the first admin user for the RBAC system
 
