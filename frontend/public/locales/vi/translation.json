@@ -55,5 +55,37 @@
   "language": {
     "en": "English",
     "vi": "Tiếng Việt"
+  },
+  "suggestion": {
+    "title": "Đề Xuất Tính Năng Mới",
+    "description": "Chia sẻ ý tưởng của bạn về tính năng mới! Đội ngũ quản trị sẽ xem xét đề xuất của bạn và nếu được chấp thuận, sẽ thêm vào danh sách bình chọn để cộng đồng bỏ phiếu.",
+    "titleEn": "Tiêu đề (Tiếng Anh)",
+    "titleVi": "Tiêu đề (Tiếng Việt)",
+    "descEn": "Mô tả (Tiếng Anh)",
+    "descVi": "Mô tả (Tiếng Việt)",
+    "placeholderTitleEn": "vd: Dark mode support",
+    "placeholderTitleVi": "vd: Hỗ trợ chế độ tối",
+    "placeholderDescEn": "Describe your feature idea...",
+    "placeholderDescVi": "Mô tả ý tưởng của bạn...",
+    "required": "Bắt buộc",
+    "cancel": "Hủy",
+    "submit": "Gửi Đề Xuất",
+    "submitting": "Đang gửi...",
+    "success": {
+      "title": "Đã Gửi Đề Xuất Thành Công!",
+      "description": "Đề xuất tính năng của bạn đã được gửi đến đội ngũ quản trị để xem xét. Bạn sẽ được thông báo khi đề xuất được chấp thuận hoặc thêm vào danh sách bình chọn."
+    },
+    "error": {
+      "title": "Gửi Thất Bại",
+      "description": "Không thể gửi đề xuất của bạn. Vui lòng kiểm tra kết nối và thử lại.",
+      "authRequired": {
+        "title": "Yêu Cầu Đăng Nhập",
+        "description": "Vui lòng đăng nhập để gửi đề xuất tính năng"
+      },
+      "missingFields": {
+        "title": "Thiếu Trường Bắt Buộc",
+        "description": "Vui lòng cung cấp tiêu đề bằng cả Tiếng Anh và Tiếng Việt để mọi người có thể hiểu đề xuất của bạn"
+      }
+    }
   }
 }

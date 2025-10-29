@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,7 @@ interface SuggestionFormProps {
 }
 
 export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionFormProps) {
+  const { t } = useTranslation()
   const { token } = useAuth()
   const { toast } = useToast()
   const { executeRecaptcha } = useRecaptcha()
@@ -40,18 +42,20 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
 
     if (!token) {
       toast({
-        title: 'Not logged in',
-        description: 'Please log in to suggest features',
+        title: `🔒 ${t('suggestion.error.authRequired.title')}`,
+        description: t('suggestion.error.authRequired.description'),
         variant: 'destructive',
+        duration: 4000,
       })
       return
     }
 
     if (!formData.titleEn || !formData.titleVi) {
       toast({
-        title: 'Missing fields',
-        description: 'Please fill in both English and Vietnamese titles',
+        title: `⚠️ ${t('suggestion.error.missingFields.title')}`,
+        description: t('suggestion.error.missingFields.description'),
         variant: 'destructive',
+        duration: 4000,
       })
       return
     }
@@ -80,18 +84,24 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
       }
 
       toast({
-        title: '🎉 Suggestion submitted!',
-        description: 'Admin will review your feature request',
+        title: `✅ ${t('suggestion.success.title')}`,
+        description: t('suggestion.success.description'),
+        duration: 5000,
       })
 
       setFormData({ titleEn: '', titleVi: '', descEn: '', descVi: '' })
-      onSuccess()
-      onClose()
+      
+      // Close form after a short delay to let user see the success message
+      setTimeout(() => {
+        onSuccess()
+        onClose()
+      }, 500)
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to submit suggestion',
+        title: `❌ ${t('suggestion.error.title')}`,
+        description: error.message || t('suggestion.error.description'),
         variant: 'destructive',
+        duration: 5000,
       })
     } finally {
       setLoading(false)
@@ -102,9 +112,9 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Suggest a Feature</DialogTitle>
+          <DialogTitle>💡 {t('suggestion.title')}</DialogTitle>
           <DialogDescription>
-            Share your idea for a new feature. Admin will review and may add it to the voting list.
+            {t('suggestion.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -113,13 +123,13 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
             {/* Title EN */}
             <div className="space-y-2">
               <Label htmlFor="titleEn">
-                Title (English) <span className="text-destructive">*</span>
+                {t('suggestion.titleEn')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="titleEn"
                 value={formData.titleEn}
                 onChange={(e) => setFormData({ ...formData, titleEn: e.target.value })}
-                placeholder="e.g., Dark mode support"
+                placeholder={t('suggestion.placeholderTitleEn')}
                 required
               />
             </div>
@@ -127,37 +137,37 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
             {/* Title VI */}
             <div className="space-y-2">
               <Label htmlFor="titleVi">
-                Title (Vietnamese) <span className="text-destructive">*</span>
+                {t('suggestion.titleVi')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="titleVi"
                 value={formData.titleVi}
                 onChange={(e) => setFormData({ ...formData, titleVi: e.target.value })}
-                placeholder="vd: Hỗ trợ chế độ tối"
+                placeholder={t('suggestion.placeholderTitleVi')}
                 required
               />
             </div>
 
             {/* Description EN */}
             <div className="space-y-2">
-              <Label htmlFor="descEn">Description (English)</Label>
+              <Label htmlFor="descEn">{t('suggestion.descEn')}</Label>
               <Textarea
                 id="descEn"
                 value={formData.descEn}
                 onChange={(e) => setFormData({ ...formData, descEn: e.target.value })}
-                placeholder="Describe your feature idea..."
+                placeholder={t('suggestion.placeholderDescEn')}
                 rows={4}
               />
             </div>
 
             {/* Description VI */}
             <div className="space-y-2">
-              <Label htmlFor="descVi">Description (Vietnamese)</Label>
+              <Label htmlFor="descVi">{t('suggestion.descVi')}</Label>
               <Textarea
                 id="descVi"
                 value={formData.descVi}
                 onChange={(e) => setFormData({ ...formData, descVi: e.target.value })}
-                placeholder="Mô tả ý tưởng của bạn..."
+                placeholder={t('suggestion.placeholderDescVi')}
                 rows={4}
               />
             </div>
@@ -171,16 +181,16 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
               disabled={loading}
               className="flex-1"
             >
-              Cancel
+              {t('suggestion.cancel')}
             </Button>
             <Button type="submit" disabled={loading} className="flex-1">
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  {t('suggestion.submitting')}
                 </>
               ) : (
-                'Submit Suggestion'
+                t('suggestion.submit')
               )}
             </Button>
           </div>

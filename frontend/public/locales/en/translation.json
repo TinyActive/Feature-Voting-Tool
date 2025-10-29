@@ -55,5 +55,37 @@
   "language": {
     "en": "English",
     "vi": "Tiếng Việt"
+  },
+  "suggestion": {
+    "title": "Suggest a New Feature",
+    "description": "Share your idea for a new feature! Our admin team will review your suggestion and, if approved, add it to the voting list for the community to vote on.",
+    "titleEn": "Title (English)",
+    "titleVi": "Title (Vietnamese)",
+    "descEn": "Description (English)",
+    "descVi": "Description (Vietnamese)",
+    "placeholderTitleEn": "e.g., Dark mode support",
+    "placeholderTitleVi": "e.g., Hỗ trợ chế độ tối",
+    "placeholderDescEn": "Describe your feature idea...",
+    "placeholderDescVi": "Mô tả ý tưởng của bạn...",
+    "required": "Required",
+    "cancel": "Cancel",
+    "submit": "Submit Suggestion",
+    "submitting": "Submitting...",
+    "success": {
+      "title": "Suggestion Submitted Successfully!",
+      "description": "Your feature suggestion has been sent to the admin team for review. You will be notified once it is approved or added to the voting list."
+    },
+    "error": {
+      "title": "Submission Failed",
+      "description": "Unable to submit your suggestion. Please check your connection and try again.",
+      "authRequired": {
+        "title": "Authentication Required",
+        "description": "Please log in to submit feature suggestions"
+      },
+      "missingFields": {
+        "title": "Required Fields Missing",
+        "description": "Please provide titles in both English and Vietnamese to help everyone understand your suggestion"
+      }
+    }
   }
 }
