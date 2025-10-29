@@ -160,7 +160,7 @@ VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key  # Site key reCAPTCHA v3
 Trong production, `VITE_API_URL` nên được đặt thành URL của worker đã triển khai, ví dụ:
 ```
 VITE_API_URL=https://feature-voting-worker.yourdomain.workers.dev
-VITE_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 Hoặc nếu bạn sử dụng tên miền tùy chỉnh:
