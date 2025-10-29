@@ -7,7 +7,7 @@ import {
   deleteFeature,
 } from '../db/queries'
 import { corsHeaders } from '../utils/cors'
-import { verifyAdminToken } from '../middleware/auth'
+import { verifyAdminToken, deleteAllUserSessions } from '../middleware/auth'
 import { sendTelegramNotification } from '../utils/telegram'
 import { verifyRecaptcha } from '../utils/recaptcha'
 
@@ -142,6 +142,32 @@ export async function handleAdminStats(request: Request, env: Env): Promise<Resp
     console.error('Stats error:', error)
     return jsonResponse(
       { error: error.message || 'Failed to fetch stats' },
+      500
+    )
+  }
+}
+
+/**
+ * Verify admin token and logout all user sessions
+ * POST /api/admin/verify
+ * Headers: Authorization: Bearer <admin_token>
+ */
+export async function handleAdminVerify(request: Request, env: Env): Promise<Response> {
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
+
+  try {
+    // Delete all user sessions when admin logs in
+    await deleteAllUserSessions(env)
+
+    return jsonResponse({
+      success: true,
+      message: 'Admin verified, all user sessions cleared',
+    })
+  } catch (error: any) {
+    console.error('Admin verify error:', error)
+    return jsonResponse(
+      { error: error.message || 'Failed to verify admin' },
       500
     )
   }

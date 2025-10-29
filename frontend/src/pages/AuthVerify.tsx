@@ -35,6 +35,9 @@ export default function AuthVerify() {
 
       const data = await response.json()
       
+      // Clear admin token if exists (user login should logout admin)
+      sessionStorage.removeItem('adminToken')
+      
       // Save token to localStorage
       localStorage.setItem('auth_token', data.token)
       

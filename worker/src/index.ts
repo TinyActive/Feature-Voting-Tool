@@ -1,5 +1,5 @@
 import { handleFeatures, handleVote } from './handlers/features'
-import { handleAdminFeatures, handleAdminStats } from './handlers/admin'
+import { handleAdminFeatures, handleAdminStats, handleAdminVerify } from './handlers/admin'
 import { handleLoginRequest, handleVerifyToken, handleGetCurrentUser, handleLogout } from './handlers/auth'
 import { handleCreateSuggestion, handleGetMySuggestions, handleGetAllSuggestions, handleApproveSuggestion, handleRejectSuggestion } from './handlers/suggestions'
 import { handleGetComments, handleCreateComment, handleUpdateComment, handleDeleteComment } from './handlers/comments'
@@ -54,6 +54,10 @@ export default {
 
       if (path === '/api/admin/stats' && request.method === 'GET') {
         return await handleAdminStats(request, env)
+      }
+
+      if (path === '/api/admin/verify' && request.method === 'POST') {
+        return await handleAdminVerify(request, env)
       }
 
       // Auth endpoints

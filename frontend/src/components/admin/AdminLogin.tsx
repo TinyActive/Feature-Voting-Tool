@@ -3,17 +3,27 @@ import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
 
 interface AdminLoginProps {
-  onLogin: (token: string) => void
+  onLogin: (token: string) => Promise<void>
 }
 
 export default function AdminLogin({ onLogin }: AdminLoginProps) {
   const { t } = useTranslation()
   const [token, setToken] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (token.trim()) {
-      onLogin(token.trim())
+      try {
+        setLoading(true)
+        setError('')
+        await onLogin(token.trim())
+      } catch (err) {
+        setError('Invalid admin token')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -44,14 +54,19 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
               className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Enter admin token"
               required
+              disabled={loading}
             />
+            {error && (
+              <p className="mt-2 text-sm text-red-600">{error}</p>
+            )}
           </div>
 
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium"
+            disabled={loading}
+            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t('admin.loginButton')}
+            {loading ? 'Verifying...' : t('admin.loginButton')}
           </button>
         </form>
       </div>

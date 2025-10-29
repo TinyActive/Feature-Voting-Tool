@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS comments (
   user_id TEXT NOT NULL,
   content TEXT NOT NULL,
   parent_id TEXT,
+  is_admin INTEGER DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE,
@@ -75,6 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_feature ON comments(feature_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
 CREATE INDEX IF NOT EXISTS idx_comments_created ON comments(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comments_is_admin ON comments(is_admin);
 
 -- Votes table (updated to track user votes)
 CREATE TABLE IF NOT EXISTS votes (

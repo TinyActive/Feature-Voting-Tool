@@ -2,6 +2,7 @@ import { Env } from '../index'
 import { corsHeaders } from '../utils/cors'
 import { verifyUserSession } from './auth'
 import { verifyRecaptcha } from '../utils/recaptcha'
+import { isAdminToken } from '../middleware/auth'
 
 // Helper functions to reduce duplication
 function jsonResponse(data: any, status = 200): Response {
@@ -31,6 +32,7 @@ function mapRowToComment(row: any): Comment {
     user_id: row.user_id,
     content: row.content,
     parent_id: row.parent_id,
+    is_admin: row.is_admin === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
     ...(row.user_name && { user_name: row.user_name }),
@@ -144,6 +146,7 @@ interface Comment {
   user_id: string
   content: string
   parent_id: string | null
+  is_admin: boolean
   created_at: number
   updated_at: number
   user_name?: string
@@ -184,8 +187,18 @@ export async function handleGetComments(request: Request, env: Env): Promise<Res
  */
 export async function handleCreateComment(request: Request, env: Env): Promise<Response> {
   try {
-    const { user, error } = await verifyUser(request, env)
-    if (error) return error
+    // Check if token is admin token
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.substring(7) || ''
+    const isAdmin = isAdminToken(token, env)
+
+    // If not admin, verify as regular user
+    let user = null
+    if (!isAdmin) {
+      const { user: verifiedUser, error } = await verifyUser(request, env)
+      if (error) return error
+      user = verifiedUser
+    }
 
     const featureId = extractIdFromPath(request, 3)
     const idError = validateIdParam(featureId, 'Feature ID')
@@ -203,21 +216,26 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
     const now = Date.now()
     const trimmedContent = body.content.trim()
 
+    // For admin comments, use a special user_id or create admin user entry
+    const userId = isAdmin ? 'admin' : user!.id
+    const isAdminFlag = isAdmin ? 1 : 0
+
     await env.DB.prepare(`
-      INSERT INTO comments (id, feature_id, user_id, content, parent_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(id, featureId, user!.id, trimmedContent, body.parent_id || null, now, now).run()
+      INSERT INTO comments (id, feature_id, user_id, content, parent_id, is_admin, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, featureId, userId, trimmedContent, body.parent_id || null, isAdminFlag, now, now).run()
 
     return jsonResponse({
       id,
       feature_id: featureId,
-      user_id: user!.id,
+      user_id: userId,
       content: trimmedContent,
       parent_id: body.parent_id || null,
+      is_admin: isAdmin,
       created_at: now,
       updated_at: now,
-      user_name: user!.name || undefined,
-      user_email: user!.email,
+      user_name: isAdmin ? 'Admin' : (user!.name || undefined),
+      user_email: isAdmin ? undefined : user!.email,
     }, 201)
   } catch (error: any) {
     return handleError('Create comment', error)

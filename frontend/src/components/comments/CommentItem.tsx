@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Reply, Trash2, User } from 'lucide-react'
+import { Reply, Trash2, User, BadgeCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -14,6 +14,7 @@ interface Comment {
   user_id: string
   content: string
   parent_id: string | null
+  is_admin?: boolean
   created_at: number
   updated_at: number
   user_name?: string
@@ -36,7 +37,9 @@ export default function CommentItem({ comment, featureId, onDeleted, onReplyAdde
   const [deleting, setDeleting] = useState(false)
 
   const isOwner = user?.id === comment.user_id
-  const displayName = comment.user_name || comment.user_email?.split('@')[0] || 'Anonymous'
+  const displayName = comment.is_admin 
+    ? 'Admin' 
+    : (comment.user_name || comment.user_email?.split('@')[0] || 'Anonymous')
 
   async function handleDelete() {
     if (!token || !confirm('Delete this comment?')) return
@@ -79,7 +82,14 @@ export default function CommentItem({ comment, featureId, onDeleted, onReplyAdde
               <User className="w-4 h-4" />
             </div>
             <div>
-              <p className="font-medium text-sm">{displayName}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-medium text-sm">{displayName}</p>
+                {comment.is_admin && (
+                  <span title="Admin" className="inline-flex">
+                    <BadgeCheck className="w-4 h-4 text-green-600 fill-green-600" />
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {new Date(comment.created_at).toLocaleString()}
               </p>
