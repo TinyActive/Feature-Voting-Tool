@@ -72,6 +72,8 @@ jobs:
           CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
 
+      - name: Run Database Migrations
+        working-directory: ./worker
         run: |
           echo "Running base schema..."
           npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
