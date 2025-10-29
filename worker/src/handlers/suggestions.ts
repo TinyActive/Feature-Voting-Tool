@@ -63,6 +63,60 @@ async function verifyRecaptchaToken(
   return null
 }
 
+function handleError(operation: string, error: any): Response {
+  console.error(`${operation} error:`, error)
+  return jsonResponse(
+    { error: error.message || `Failed to ${operation.toLowerCase()}` },
+    500
+  )
+}
+
+function validateIdParam(id: string | null, paramName: string): Response | null {
+  if (!id) {
+    return jsonResponse({ error: `${paramName} required` }, 400)
+  }
+  return null
+}
+
+function validateBilingualTitle(title: any): Response | null {
+  if (!title?.en || !title?.vi) {
+    return jsonResponse({ error: 'Title (en and vi) required' }, 400)
+  }
+  return null
+}
+
+async function getSuggestionById(
+  env: Env,
+  suggestionId: string
+): Promise<{ suggestion: any; error: Response | null }> {
+  const suggestion = await env.DB.prepare('SELECT * FROM feature_suggestions WHERE id = ?')
+    .bind(suggestionId)
+    .first()
+
+  if (!suggestion) {
+    return { suggestion: null, error: jsonResponse({ error: 'Suggestion not found' }, 404) }
+  }
+
+  return { suggestion, error: null }
+}
+
+async function updateSuggestionStatus(
+  env: Env,
+  suggestionId: string,
+  status: 'approved' | 'rejected',
+  featureId?: string
+): Promise<void> {
+  const query = featureId
+    ? 'UPDATE feature_suggestions SET status = ?, approved_feature_id = ?, updated_at = ? WHERE id = ?'
+    : 'UPDATE feature_suggestions SET status = ?, updated_at = ? WHERE id = ?'
+  
+  const params = featureId
+    ? [status, featureId, Date.now(), suggestionId]
+    : [status, Date.now(), suggestionId]
+  
+  await env.DB.prepare(query).bind(...params).run()
+}
+
 interface Suggestion {
   id: string
   user_id: string
@@ -88,52 +142,33 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
 
     const body: any = await request.json()
     
-    const recaptchaError = await verifyRecaptchaToken(
-      body.recaptchaToken,
-      env,
-      'suggest_feature'
-    )
+    const recaptchaError = await verifyRecaptchaToken(body.recaptchaToken, env, 'suggest_feature')
     if (recaptchaError) return recaptchaError
     
-    if (!body.title?.en || !body.title?.vi) {
-      return jsonResponse({ error: 'Title (en and vi) required' }, 400)
-    }
+    const titleError = validateBilingualTitle(body.title)
+    if (titleError) return titleError
 
     const id = crypto.randomUUID()
     const now = Date.now()
+    const desc = body.description || { en: '', vi: '' }
 
     await env.DB.prepare(`
       INSERT INTO feature_suggestions (id, user_id, title_en, title_vi, desc_en, desc_vi, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).bind(
-      id,
-      user!.id,
-      body.title.en,
-      body.title.vi,
-      body.description?.en || '',
-      body.description?.vi || '',
-      now,
-      now
-    ).run()
+    `).bind(id, user!.id, body.title.en, body.title.vi, desc.en, desc.vi, now, now).run()
 
-    const suggestion: Suggestion = {
+    return jsonResponse({
       id,
       user_id: user!.id,
       title: body.title,
-      description: body.description || { en: '', vi: '' },
+      description: desc,
       status: 'pending',
       approved_feature_id: null,
       created_at: now,
       updated_at: now,
-    }
-
-    return jsonResponse(suggestion)
+    })
   } catch (error: any) {
-    console.error('Create suggestion error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to create suggestion' },
-      500
-    )
+    return handleError('Create suggestion', error)
   }
 }
 
@@ -153,15 +188,9 @@ export async function handleGetMySuggestions(request: Request, env: Env): Promis
       ORDER BY created_at DESC
     `).bind(user!.id).all()
 
-    const suggestions: Suggestion[] = results.results.map(mapRowToSuggestion)
-
-    return jsonResponse(suggestions)
+    return jsonResponse(results.results.map(mapRowToSuggestion))
   } catch (error: any) {
-    console.error('Get suggestions error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to get suggestions' },
-      500
-    )
+    return handleError('Get suggestions', error)
   }
 }
 
@@ -186,15 +215,9 @@ export async function handleGetAllSuggestions(request: Request, env: Env): Promi
       ORDER BY s.created_at DESC
     `).bind(status).all()
 
-    const suggestions: Suggestion[] = results.results.map(mapRowToSuggestion)
-
-    return jsonResponse(suggestions)
+    return jsonResponse(results.results.map(mapRowToSuggestion))
   } catch (error: any) {
-    console.error('Get all suggestions error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to get suggestions' },
-      500
-    )
+    return handleError('Get all suggestions', error)
   }
 }
 
@@ -209,28 +232,18 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
 
   try {
     const suggestionId = extractSuggestionId(request)
-    if (!suggestionId) {
-      return jsonResponse({ error: 'Suggestion ID required' }, 400)
-    }
+    const idError = validateIdParam(suggestionId, 'Suggestion ID')
+    if (idError) return idError
 
-    const suggestion = await env.DB.prepare('SELECT * FROM feature_suggestions WHERE id = ?')
-      .bind(suggestionId)
-      .first()
-
-    if (!suggestion) {
-      return jsonResponse({ error: 'Suggestion not found' }, 404)
-    }
+    const { suggestion, error: fetchError } = await getSuggestionById(env, suggestionId!)
+    if (fetchError) return fetchError
 
     const feature = await createFeature(env, {
       title: { en: suggestion.title_en as string, vi: suggestion.title_vi as string },
       description: { en: suggestion.desc_en as string || '', vi: suggestion.desc_vi as string || '' },
     })
 
-    await env.DB.prepare(`
-      UPDATE feature_suggestions 
-      SET status = 'approved', approved_feature_id = ?, updated_at = ?
-      WHERE id = ?
-    `).bind(feature.id, Date.now(), suggestionId).run()
+    await updateSuggestionStatus(env, suggestionId!, 'approved', feature.id)
 
     return jsonResponse({ 
       success: true, 
@@ -238,11 +251,7 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
       message: 'Suggestion approved and feature created'
     })
   } catch (error: any) {
-    console.error('Approve suggestion error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to approve suggestion' },
-      500
-    )
+    return handleError('Approve suggestion', error)
   }
 }
 
@@ -257,25 +266,16 @@ export async function handleRejectSuggestion(request: Request, env: Env): Promis
 
   try {
     const suggestionId = extractSuggestionId(request)
-    if (!suggestionId) {
-      return jsonResponse({ error: 'Suggestion ID required' }, 400)
-    }
+    const idError = validateIdParam(suggestionId, 'Suggestion ID')
+    if (idError) return idError
 
-    await env.DB.prepare(`
-      UPDATE feature_suggestions 
-      SET status = 'rejected', updated_at = ?
-      WHERE id = ?
-    `).bind(Date.now(), suggestionId).run()
+    await updateSuggestionStatus(env, suggestionId!, 'rejected')
 
     return jsonResponse({ 
       success: true,
       message: 'Suggestion rejected'
     })
   } catch (error: any) {
-    console.error('Reject suggestion error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to reject suggestion' },
-      500
-    )
+    return handleError('Reject suggestion', error)
   }
 }

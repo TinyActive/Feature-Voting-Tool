@@ -83,6 +83,38 @@ async function verifyRecaptchaToken(
   return null
 }
 
+function handleError(operation: string, error: any): Response {
+  console.error(`${operation} error:`, error)
+  return jsonResponse(
+    { error: error.message || `Failed to ${operation.toLowerCase()}` },
+    500
+  )
+}
+
+function validateIdParam(id: string | null, paramName: string): Response | null {
+  if (!id) {
+    return jsonResponse({ error: `${paramName} required` }, 400)
+  }
+  return null
+}
+
+async function verifyUserAndCommentOwnership(
+  request: Request,
+  env: Env
+): Promise<{ user: any; commentId: string; error: Response | null }> {
+  const { user, error: authError } = await verifyUser(request, env)
+  if (authError) return { user: null, commentId: '', error: authError }
+
+  const commentId = extractIdFromPath(request, 3)
+  const idError = validateIdParam(commentId, 'Comment ID')
+  if (idError) return { user: null, commentId: '', error: idError }
+
+  const { error: ownershipError } = await verifyCommentOwnership(env, commentId!, user!.id)
+  if (ownershipError) return { user: null, commentId: '', error: ownershipError }
+
+  return { user, commentId: commentId!, error: null }
+}
+
 function buildCommentTree(comments: Comment[]): Comment[] {
   const commentMap = new Map<string, Comment>()
   const rootComments: Comment[] = []
@@ -126,9 +158,8 @@ interface Comment {
 export async function handleGetComments(request: Request, env: Env): Promise<Response> {
   try {
     const featureId = extractIdFromPath(request, 3)
-    if (!featureId) {
-      return jsonResponse({ error: 'Feature ID required' }, 400)
-    }
+    const idError = validateIdParam(featureId, 'Feature ID')
+    if (idError) return idError
 
     const results = await env.DB.prepare(`
       SELECT c.*, u.email as user_email, u.name as user_name
@@ -139,15 +170,9 @@ export async function handleGetComments(request: Request, env: Env): Promise<Res
     `).bind(featureId).all()
 
     const comments: Comment[] = results.results.map(mapRowToComment)
-    const rootComments = buildCommentTree(comments)
-
-    return jsonResponse(rootComments)
+    return jsonResponse(buildCommentTree(comments))
   } catch (error: any) {
-    console.error('Get comments error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to get comments' },
-      500
-    )
+    return handleError('Get comments', error)
   }
 }
 
@@ -163,17 +188,12 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
     if (error) return error
 
     const featureId = extractIdFromPath(request, 3)
-    if (!featureId) {
-      return jsonResponse({ error: 'Feature ID required' }, 400)
-    }
+    const idError = validateIdParam(featureId, 'Feature ID')
+    if (idError) return idError
 
     const body: any = await request.json()
     
-    const recaptchaError = await verifyRecaptchaToken(
-      body.recaptchaToken,
-      env,
-      'create_comment'
-    )
+    const recaptchaError = await verifyRecaptchaToken(body.recaptchaToken, env, 'create_comment')
     if (recaptchaError) return recaptchaError
     
     const contentError = validateContent(body.content)
@@ -181,39 +201,26 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
 
     const id = crypto.randomUUID()
     const now = Date.now()
+    const trimmedContent = body.content.trim()
 
     await env.DB.prepare(`
       INSERT INTO comments (id, feature_id, user_id, content, parent_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      id,
-      featureId,
-      user!.id,
-      body.content.trim(),
-      body.parent_id || null,
-      now,
-      now
-    ).run()
+    `).bind(id, featureId, user!.id, trimmedContent, body.parent_id || null, now, now).run()
 
-    const comment: Comment = {
+    return jsonResponse({
       id,
       feature_id: featureId,
       user_id: user!.id,
-      content: body.content.trim(),
+      content: trimmedContent,
       parent_id: body.parent_id || null,
       created_at: now,
       updated_at: now,
       user_name: user!.name || undefined,
       user_email: user!.email,
-    }
-
-    return jsonResponse(comment, 201)
+    }, 201)
   } catch (error: any) {
-    console.error('Create comment error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to create comment' },
-      500
-    )
+    return handleError('Create comment', error)
   }
 }
 
@@ -225,38 +232,20 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
  */
 export async function handleUpdateComment(request: Request, env: Env): Promise<Response> {
   try {
-    const { user, error: authError } = await verifyUser(request, env)
-    if (authError) return authError
-
-    const commentId = extractIdFromPath(request, 3)
-    if (!commentId) {
-      return jsonResponse({ error: 'Comment ID required' }, 400)
-    }
-
-    const { error: ownershipError } = await verifyCommentOwnership(env, commentId, user!.id)
-    if (ownershipError) return ownershipError
+    const { commentId, error } = await verifyUserAndCommentOwnership(request, env)
+    if (error) return error
 
     const body: any = await request.json()
-    
     const contentError = validateContent(body.content)
     if (contentError) return contentError
 
     await env.DB.prepare(`
-      UPDATE comments 
-      SET content = ?, updated_at = ?
-      WHERE id = ?
+      UPDATE comments SET content = ?, updated_at = ? WHERE id = ?
     `).bind(body.content.trim(), Date.now(), commentId).run()
 
-    return jsonResponse({ 
-      success: true,
-      message: 'Comment updated'
-    })
+    return jsonResponse({ success: true, message: 'Comment updated' })
   } catch (error: any) {
-    console.error('Update comment error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to update comment' },
-      500
-    )
+    return handleError('Update comment', error)
   }
 }
 
@@ -267,30 +256,13 @@ export async function handleUpdateComment(request: Request, env: Env): Promise<R
  */
 export async function handleDeleteComment(request: Request, env: Env): Promise<Response> {
   try {
-    const { user, error: authError } = await verifyUser(request, env)
-    if (authError) return authError
+    const { commentId, error } = await verifyUserAndCommentOwnership(request, env)
+    if (error) return error
 
-    const commentId = extractIdFromPath(request, 3)
-    if (!commentId) {
-      return jsonResponse({ error: 'Comment ID required' }, 400)
-    }
+    await env.DB.prepare('DELETE FROM comments WHERE id = ?').bind(commentId).run()
 
-    const { error: ownershipError } = await verifyCommentOwnership(env, commentId, user!.id)
-    if (ownershipError) return ownershipError
-
-    await env.DB.prepare('DELETE FROM comments WHERE id = ?')
-      .bind(commentId)
-      .run()
-
-    return jsonResponse({ 
-      success: true,
-      message: 'Comment deleted'
-    })
+    return jsonResponse({ success: true, message: 'Comment deleted' })
   } catch (error: any) {
-    console.error('Delete comment error:', error)
-    return jsonResponse(
-      { error: error.message || 'Failed to delete comment' },
-      500
-    )
+    return handleError('Delete comment', error)
   }
 }
