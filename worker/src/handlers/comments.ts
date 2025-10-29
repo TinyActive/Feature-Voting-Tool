@@ -3,6 +3,109 @@ import { corsHeaders } from '../utils/cors'
 import { verifyUserSession } from './auth'
 import { verifyRecaptcha } from '../utils/recaptcha'
 
+// Helper functions to reduce duplication
+function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+async function verifyUser(request: Request, env: Env) {
+  const user = await verifyUserSession(request, env)
+  if (!user) {
+    return { user: null, error: jsonResponse({ error: 'Unauthorized' }, 401) }
+  }
+  return { user, error: null }
+}
+
+function extractIdFromPath(request: Request, position: number): string | null {
+  const url = new URL(request.url)
+  return url.pathname.split('/')[position] || null
+}
+
+function mapRowToComment(row: any): Comment {
+  return {
+    id: row.id,
+    feature_id: row.feature_id,
+    user_id: row.user_id,
+    content: row.content,
+    parent_id: row.parent_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    ...(row.user_name && { user_name: row.user_name }),
+    ...(row.user_email && { user_email: row.user_email }),
+  }
+}
+
+async function verifyCommentOwnership(
+  env: Env,
+  commentId: string,
+  userId: string
+): Promise<{ comment: any; error: Response | null }> {
+  const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?')
+    .bind(commentId)
+    .first()
+
+  if (!comment) {
+    return { comment: null, error: jsonResponse({ error: 'Comment not found' }, 404) }
+  }
+
+  if (comment.user_id !== userId) {
+    return { comment: null, error: jsonResponse({ error: 'Forbidden' }, 403) }
+  }
+
+  return { comment, error: null }
+}
+
+function validateContent(content: string, maxLength = 2000): Response | null {
+  if (!content || content.trim().length === 0) {
+    return jsonResponse({ error: 'Content required' }, 400)
+  }
+  if (content.length > maxLength) {
+    return jsonResponse({ error: `Content too long (max ${maxLength} characters)` }, 400)
+  }
+  return null
+}
+
+async function verifyRecaptchaToken(
+  token: string,
+  env: Env,
+  action: string
+): Promise<Response | null> {
+  const result = await verifyRecaptcha(token, env, action)
+  if (!result.success) {
+    return jsonResponse(
+      { error: result.error || 'Security verification failed' },
+      400
+    )
+  }
+  return null
+}
+
+function buildCommentTree(comments: Comment[]): Comment[] {
+  const commentMap = new Map<string, Comment>()
+  const rootComments: Comment[] = []
+
+  comments.forEach(comment => {
+    comment.replies = []
+    commentMap.set(comment.id, comment)
+  })
+
+  comments.forEach(comment => {
+    if (comment.parent_id) {
+      const parent = commentMap.get(comment.parent_id)
+      if (parent) {
+        parent.replies!.push(comment)
+      }
+    } else {
+      rootComments.push(comment)
+    }
+  })
+
+  return rootComments
+}
+
 interface Comment {
   id: string
   feature_id: string
@@ -22,17 +125,11 @@ interface Comment {
  */
 export async function handleGetComments(request: Request, env: Env): Promise<Response> {
   try {
-    const url = new URL(request.url)
-    const featureId = url.pathname.split('/')[3]
-
+    const featureId = extractIdFromPath(request, 3)
     if (!featureId) {
-      return new Response(JSON.stringify({ error: 'Feature ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Feature ID required' }, 400)
     }
 
-    // Get all comments with user info
     const results = await env.DB.prepare(`
       SELECT c.*, u.email as user_email, u.name as user_name
       FROM comments c
@@ -41,47 +138,16 @@ export async function handleGetComments(request: Request, env: Env): Promise<Res
       ORDER BY c.created_at ASC
     `).bind(featureId).all()
 
-    const comments: Comment[] = results.results.map((row: any) => ({
-      id: row.id,
-      feature_id: row.feature_id,
-      user_id: row.user_id,
-      content: row.content,
-      parent_id: row.parent_id,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      user_name: row.user_name,
-      user_email: row.user_email,
-    }))
+    const comments: Comment[] = results.results.map(mapRowToComment)
+    const rootComments = buildCommentTree(comments)
 
-    // Organize into tree structure
-    const commentMap = new Map<string, Comment>()
-    const rootComments: Comment[] = []
-
-    comments.forEach(comment => {
-      comment.replies = []
-      commentMap.set(comment.id, comment)
-    })
-
-    comments.forEach(comment => {
-      if (comment.parent_id) {
-        const parent = commentMap.get(comment.parent_id)
-        if (parent) {
-          parent.replies!.push(comment)
-        }
-      } else {
-        rootComments.push(comment)
-      }
-    })
-
-    return new Response(JSON.stringify(rootComments), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(rootComments)
   } catch (error: any) {
     console.error('Get comments error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to get comments' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to get comments' },
+      500
+    )
   }
 }
 
@@ -93,48 +159,25 @@ export async function handleGetComments(request: Request, env: Env): Promise<Res
  */
 export async function handleCreateComment(request: Request, env: Env): Promise<Response> {
   try {
-    const user = await verifyUserSession(request, env)
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { user, error } = await verifyUser(request, env)
+    if (error) return error
 
-    const url = new URL(request.url)
-    const featureId = url.pathname.split('/')[3]
-
+    const featureId = extractIdFromPath(request, 3)
     if (!featureId) {
-      return new Response(JSON.stringify({ error: 'Feature ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Feature ID required' }, 400)
     }
 
     const body: any = await request.json()
     
-    // Verify reCAPTCHA
-    const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'create_comment')
-    if (!recaptchaResult.success) {
-      return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const recaptchaError = await verifyRecaptchaToken(
+      body.recaptchaToken,
+      env,
+      'create_comment'
+    )
+    if (recaptchaError) return recaptchaError
     
-    if (!body.content || body.content.trim().length === 0) {
-      return new Response(JSON.stringify({ error: 'Content required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (body.content.length > 2000) {
-      return new Response(JSON.stringify({ error: 'Content too long (max 2000 characters)' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const contentError = validateContent(body.content)
+    if (contentError) return contentError
 
     const id = crypto.randomUUID()
     const now = Date.now()
@@ -145,7 +188,7 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
     `).bind(
       id,
       featureId,
-      user.id,
+      user!.id,
       body.content.trim(),
       body.parent_id || null,
       now,
@@ -155,25 +198,22 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
     const comment: Comment = {
       id,
       feature_id: featureId,
-      user_id: user.id,
+      user_id: user!.id,
       content: body.content.trim(),
       parent_id: body.parent_id || null,
       created_at: now,
       updated_at: now,
-      user_name: user.name || undefined,
-      user_email: user.email,
+      user_name: user!.name || undefined,
+      user_email: user!.email,
     }
 
-    return new Response(JSON.stringify(comment), {
-      status: 201,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(comment, 201)
   } catch (error: any) {
     console.error('Create comment error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to create comment' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to create comment' },
+      500
+    )
   }
 }
 
@@ -185,51 +225,21 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
  */
 export async function handleUpdateComment(request: Request, env: Env): Promise<Response> {
   try {
-    const user = await verifyUserSession(request, env)
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { user, error: authError } = await verifyUser(request, env)
+    if (authError) return authError
 
-    const url = new URL(request.url)
-    const commentId = url.pathname.split('/')[3]
-
+    const commentId = extractIdFromPath(request, 3)
     if (!commentId) {
-      return new Response(JSON.stringify({ error: 'Comment ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Comment ID required' }, 400)
     }
 
-    // Check if comment exists and belongs to user
-    const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?')
-      .bind(commentId)
-      .first()
-
-    if (!comment) {
-      return new Response(JSON.stringify({ error: 'Comment not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (comment.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { error: ownershipError } = await verifyCommentOwnership(env, commentId, user!.id)
+    if (ownershipError) return ownershipError
 
     const body: any = await request.json()
     
-    if (!body.content || body.content.trim().length === 0) {
-      return new Response(JSON.stringify({ error: 'Content required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const contentError = validateContent(body.content)
+    if (contentError) return contentError
 
     await env.DB.prepare(`
       UPDATE comments 
@@ -237,18 +247,16 @@ export async function handleUpdateComment(request: Request, env: Env): Promise<R
       WHERE id = ?
     `).bind(body.content.trim(), Date.now(), commentId).run()
 
-    return new Response(JSON.stringify({ 
+    return jsonResponse({ 
       success: true,
       message: 'Comment updated'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
     console.error('Update comment error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to update comment' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to update comment' },
+      500
+    )
   }
 }
 
@@ -259,59 +267,30 @@ export async function handleUpdateComment(request: Request, env: Env): Promise<R
  */
 export async function handleDeleteComment(request: Request, env: Env): Promise<Response> {
   try {
-    const user = await verifyUserSession(request, env)
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { user, error: authError } = await verifyUser(request, env)
+    if (authError) return authError
 
-    const url = new URL(request.url)
-    const commentId = url.pathname.split('/')[3]
-
+    const commentId = extractIdFromPath(request, 3)
     if (!commentId) {
-      return new Response(JSON.stringify({ error: 'Comment ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Comment ID required' }, 400)
     }
 
-    // Check if comment exists and belongs to user
-    const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?')
-      .bind(commentId)
-      .first()
+    const { error: ownershipError } = await verifyCommentOwnership(env, commentId, user!.id)
+    if (ownershipError) return ownershipError
 
-    if (!comment) {
-      return new Response(JSON.stringify({ error: 'Comment not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (comment.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Delete comment (cascade will delete replies)
     await env.DB.prepare('DELETE FROM comments WHERE id = ?')
       .bind(commentId)
       .run()
 
-    return new Response(JSON.stringify({ 
+    return jsonResponse({ 
       success: true,
       message: 'Comment deleted'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
     console.error('Delete comment error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to delete comment' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to delete comment' },
+      500
+    )
   }
 }

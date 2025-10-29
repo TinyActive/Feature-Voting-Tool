@@ -5,6 +5,64 @@ import { verifyAdminToken } from '../middleware/auth'
 import { createFeature } from '../db/queries'
 import { verifyRecaptcha } from '../utils/recaptcha'
 
+// Helper functions to reduce duplication
+function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+async function verifyUser(request: Request, env: Env) {
+  const user = await verifyUserSession(request, env)
+  if (!user) {
+    return { user: null, error: jsonResponse({ error: 'Unauthorized' }, 401) }
+  }
+  return { user, error: null }
+}
+
+function verifyAdmin(request: Request, env: Env): Response | null {
+  const authResult = verifyAdminToken(request, env)
+  if (!authResult.authorized) {
+    return jsonResponse({ error: 'Unauthorized' }, 401)
+  }
+  return null
+}
+
+function extractSuggestionId(request: Request): string | null {
+  const url = new URL(request.url)
+  return url.pathname.split('/')[4] || null
+}
+
+function mapRowToSuggestion(row: any): Suggestion {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    title: { en: row.title_en, vi: row.title_vi },
+    description: { en: row.desc_en || '', vi: row.desc_vi || '' },
+    status: row.status,
+    approved_feature_id: row.approved_feature_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    ...(row.user_email && { user_email: row.user_email }),
+  }
+}
+
+async function verifyRecaptchaToken(
+  token: string,
+  env: Env,
+  action: string
+): Promise<Response | null> {
+  const result = await verifyRecaptcha(token, env, action)
+  if (!result.success) {
+    return jsonResponse(
+      { error: result.error || 'Security verification failed' },
+      400
+    )
+  }
+  return null
+}
+
 interface Suggestion {
   id: string
   user_id: string
@@ -25,30 +83,20 @@ interface Suggestion {
  */
 export async function handleCreateSuggestion(request: Request, env: Env): Promise<Response> {
   try {
-    const user = await verifyUserSession(request, env)
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { user, error } = await verifyUser(request, env)
+    if (error) return error
 
     const body: any = await request.json()
     
-    // Verify reCAPTCHA
-    const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'suggest_feature')
-    if (!recaptchaResult.success) {
-      return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const recaptchaError = await verifyRecaptchaToken(
+      body.recaptchaToken,
+      env,
+      'suggest_feature'
+    )
+    if (recaptchaError) return recaptchaError
     
     if (!body.title?.en || !body.title?.vi) {
-      return new Response(JSON.stringify({ error: 'Title (en and vi) required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Title (en and vi) required' }, 400)
     }
 
     const id = crypto.randomUUID()
@@ -59,7 +107,7 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
     `).bind(
       id,
-      user.id,
+      user!.id,
       body.title.en,
       body.title.vi,
       body.description?.en || '',
@@ -70,7 +118,7 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
 
     const suggestion: Suggestion = {
       id,
-      user_id: user.id,
+      user_id: user!.id,
       title: body.title,
       description: body.description || { en: '', vi: '' },
       status: 'pending',
@@ -79,15 +127,13 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
       updated_at: now,
     }
 
-    return new Response(JSON.stringify(suggestion), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(suggestion)
   } catch (error: any) {
     console.error('Create suggestion error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to create suggestion' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to create suggestion' },
+      500
+    )
   }
 }
 
@@ -98,40 +144,24 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
  */
 export async function handleGetMySuggestions(request: Request, env: Env): Promise<Response> {
   try {
-    const user = await verifyUserSession(request, env)
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const { user, error } = await verifyUser(request, env)
+    if (error) return error
 
     const results = await env.DB.prepare(`
       SELECT * FROM feature_suggestions 
       WHERE user_id = ? 
       ORDER BY created_at DESC
-    `).bind(user.id).all()
+    `).bind(user!.id).all()
 
-    const suggestions: Suggestion[] = results.results.map((row: any) => ({
-      id: row.id,
-      user_id: row.user_id,
-      title: { en: row.title_en, vi: row.title_vi },
-      description: { en: row.desc_en || '', vi: row.desc_vi || '' },
-      status: row.status,
-      approved_feature_id: row.approved_feature_id,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }))
+    const suggestions: Suggestion[] = results.results.map(mapRowToSuggestion)
 
-    return new Response(JSON.stringify(suggestions), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(suggestions)
   } catch (error: any) {
     console.error('Get suggestions error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to get suggestions' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to get suggestions' },
+      500
+    )
   }
 }
 
@@ -141,13 +171,8 @@ export async function handleGetMySuggestions(request: Request, env: Env): Promis
  * Headers: Authorization: Bearer <admin-token>
  */
 export async function handleGetAllSuggestions(request: Request, env: Env): Promise<Response> {
-  const authResult = verifyAdminToken(request, env)
-  if (!authResult.authorized) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
 
   try {
     const url = new URL(request.url)
@@ -161,27 +186,15 @@ export async function handleGetAllSuggestions(request: Request, env: Env): Promi
       ORDER BY s.created_at DESC
     `).bind(status).all()
 
-    const suggestions: Suggestion[] = results.results.map((row: any) => ({
-      id: row.id,
-      user_id: row.user_id,
-      title: { en: row.title_en, vi: row.title_vi },
-      description: { en: row.desc_en || '', vi: row.desc_vi || '' },
-      status: row.status,
-      approved_feature_id: row.approved_feature_id,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      user_email: row.user_email,
-    }))
+    const suggestions: Suggestion[] = results.results.map(mapRowToSuggestion)
 
-    return new Response(JSON.stringify(suggestions), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(suggestions)
   } catch (error: any) {
     console.error('Get all suggestions error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to get suggestions' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to get suggestions' },
+      500
+    )
   }
 }
 
@@ -191,63 +204,45 @@ export async function handleGetAllSuggestions(request: Request, env: Env): Promi
  * Headers: Authorization: Bearer <admin-token>
  */
 export async function handleApproveSuggestion(request: Request, env: Env): Promise<Response> {
-  const authResult = verifyAdminToken(request, env)
-  if (!authResult.authorized) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
 
   try {
-    const url = new URL(request.url)
-    const suggestionId = url.pathname.split('/')[4]
-
+    const suggestionId = extractSuggestionId(request)
     if (!suggestionId) {
-      return new Response(JSON.stringify({ error: 'Suggestion ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Suggestion ID required' }, 400)
     }
 
-    // Get suggestion
     const suggestion = await env.DB.prepare('SELECT * FROM feature_suggestions WHERE id = ?')
       .bind(suggestionId)
       .first()
 
     if (!suggestion) {
-      return new Response(JSON.stringify({ error: 'Suggestion not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Suggestion not found' }, 404)
     }
 
-    // Create feature
     const feature = await createFeature(env, {
       title: { en: suggestion.title_en as string, vi: suggestion.title_vi as string },
       description: { en: suggestion.desc_en as string || '', vi: suggestion.desc_vi as string || '' },
     })
 
-    // Update suggestion status
     await env.DB.prepare(`
       UPDATE feature_suggestions 
       SET status = 'approved', approved_feature_id = ?, updated_at = ?
       WHERE id = ?
     `).bind(feature.id, Date.now(), suggestionId).run()
 
-    return new Response(JSON.stringify({ 
+    return jsonResponse({ 
       success: true, 
       feature,
       message: 'Suggestion approved and feature created'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
     console.error('Approve suggestion error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to approve suggestion' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to approve suggestion' },
+      500
+    )
   }
 }
 
@@ -257,23 +252,13 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
  * Headers: Authorization: Bearer <admin-token>
  */
 export async function handleRejectSuggestion(request: Request, env: Env): Promise<Response> {
-  const authResult = verifyAdminToken(request, env)
-  if (!authResult.authorized) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
 
   try {
-    const url = new URL(request.url)
-    const suggestionId = url.pathname.split('/')[4]
-
+    const suggestionId = extractSuggestionId(request)
     if (!suggestionId) {
-      return new Response(JSON.stringify({ error: 'Suggestion ID required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Suggestion ID required' }, 400)
     }
 
     await env.DB.prepare(`
@@ -282,17 +267,15 @@ export async function handleRejectSuggestion(request: Request, env: Env): Promis
       WHERE id = ?
     `).bind(Date.now(), suggestionId).run()
 
-    return new Response(JSON.stringify({ 
+    return jsonResponse({ 
       success: true,
       message: 'Suggestion rejected'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error: any) {
     console.error('Reject suggestion error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to reject suggestion' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to reject suggestion' },
+      500
+    )
   }
 }
