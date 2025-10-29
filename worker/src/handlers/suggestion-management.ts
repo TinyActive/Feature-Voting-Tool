@@ -120,14 +120,8 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
 
     // Create feature from suggestion
     const feature = await createFeature(env, {
-      title: {
-        en: typeof suggestion.title_en === 'string' ? suggestion.title_en : String(suggestion.title_en ?? ''),
-        vi: typeof suggestion.title_vi === 'string' ? suggestion.title_vi : String(suggestion.title_vi ?? ''),
-      },
-      description: {
-        en: typeof suggestion.desc_en === 'string' ? suggestion.desc_en : String(suggestion.desc_en ?? ''),
-        vi: typeof suggestion.desc_vi === 'string' ? suggestion.desc_vi : String(suggestion.desc_vi ?? ''),
-      },
+      title: { en: suggestion.title_en, vi: suggestion.title_vi },
+      description: { en: suggestion.desc_en || '', vi: suggestion.desc_vi || '' },
     })
 
     // Update suggestion status
@@ -145,8 +139,7 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
     if (userRecord) {
       try {
         const { html, text } = generateSuggestionApprovedEmail(
-          typeof suggestion.title_en === 'string' ? suggestion.title_en : String(suggestion.title_en ?? ''),
-          typeof suggestion.title_vi === 'string' ? suggestion.title_vi : String(suggestion.title_vi ?? ''),
+          suggestion.title_en,
           `${env.APP_URL}/features/${feature.id}`
         )
         await sendEmail(env, {
@@ -226,9 +219,8 @@ export async function handleRejectSuggestion(request: Request, env: Env): Promis
     if (userRecord) {
       try {
         const { html, text } = generateSuggestionRejectedEmail(
-          typeof suggestion.title_en === 'string' ? suggestion.title_en : String(suggestion.title_en ?? ''),
-          typeof suggestion.title_vi === 'string' ? suggestion.title_vi : String(suggestion.title_vi ?? ''),
-          env.APP_URL
+          suggestion.title_en,
+          reason
         )
         await sendEmail(env, {
           to: userRecord.email as string,
