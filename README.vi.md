@@ -134,7 +134,23 @@ npx wrangler secret put RESEND_API_KEY
 npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql
 ```
 
-### 5. Phát triển cục bộ
+### 5. Cấu hình môi trường frontend
+
+Tạo file `.env.local` trong thư mục `frontend`:
+
+```bash
+cd frontend
+cp .env.example .env.local
+```
+
+Chỉnh sửa `.env.local` và cập nhật các giá trị:
+
+```env
+VITE_API_URL=http://localhost:8787
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key_here
+```
+
+### 6. Phát triển cục bộ
 
 ```bash
 # Chạy worker backend

@@ -13,6 +13,31 @@ declare global {
 }
 
 /**
+ * Load reCAPTCHA script dynamically
+ */
+function loadRecaptchaScript(siteKey: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Check if script already exists
+    if (document.querySelector(`script[src*="recaptcha/api.js"]`)) {
+      if (window.grecaptcha) {
+        resolve()
+      } else {
+        reject(new Error('reCAPTCHA script loaded but grecaptcha not available'))
+      }
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load reCAPTCHA script'))
+    document.head.appendChild(script)
+  })
+}
+
+/**
  * Hook to use reCAPTCHA v3
  * @returns executeRecaptcha function to get token
  */
@@ -20,24 +45,23 @@ export function useRecaptcha() {
   const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    // Check if reCAPTCHA is already loaded
-    if (window.grecaptcha) {
-      window.grecaptcha.ready(() => {
-        setIsReady(true)
-      })
-    } else {
-      // Wait for script to load
-      const checkRecaptcha = setInterval(() => {
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('reCAPTCHA site key not configured')
+      return
+    }
+
+    // Load reCAPTCHA script
+    loadRecaptchaScript(RECAPTCHA_SITE_KEY)
+      .then(() => {
         if (window.grecaptcha) {
           window.grecaptcha.ready(() => {
             setIsReady(true)
-            clearInterval(checkRecaptcha)
           })
         }
-      }, 100)
-
-      return () => clearInterval(checkRecaptcha)
-    }
+      })
+      .catch((error) => {
+        console.error('Failed to load reCAPTCHA:', error)
+      })
   }, [])
 
   /**

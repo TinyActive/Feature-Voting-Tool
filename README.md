@@ -134,7 +134,23 @@ npx wrangler secret put RESEND_API_KEY
 npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql
 ```
 
-### 5. Local development
+### 5. Configure frontend environment
+
+Create a `.env.local` file in the `frontend` directory:
+
+```bash
+cd frontend
+cp .env.example .env.local
+```
+
+Edit `.env.local` and update the values:
+
+```env
+VITE_API_URL=http://localhost:8787
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key_here
+```
+
+### 6. Local development
 
 ```bash
 # Run worker backend

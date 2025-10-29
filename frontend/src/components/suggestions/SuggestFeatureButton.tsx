@@ -10,22 +10,13 @@ export default function SuggestFeatureButton() {
 
   if (!user) return null
 
-  const handleSuccess = () => {
-    // Refresh the page to show updated suggestions
-    window.location.reload()
-  }
-
   return (
     <>
       <Button onClick={() => setShowForm(true)} className="gap-2">
         <Lightbulb className="w-4 h-4" />
         Suggest Feature
       </Button>
-      <SuggestionForm 
-        open={showForm} 
-        onClose={() => setShowForm(false)}
-        onSuccess={handleSuccess}
-      />
+      <SuggestionForm open={showForm} onClose={() => setShowForm(false)} />
     </>
   )
 }
