@@ -160,7 +160,7 @@ VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key  # reCAPTCHA v3 site key
 In production, `VITE_API_URL` should be set to the deployed worker URL, for example:
 ```
 VITE_API_URL=https://feature-voting-worker.yourdomain.workers.dev
-VITE_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 Or if you use a custom domain:
