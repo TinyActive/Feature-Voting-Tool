@@ -14,6 +14,7 @@ Hệ thống bình chọn tính năng đa ngôn ngữ (Tiếng Anh và Tiếng V
 - 📊 Thống kê và phân tích
 - 💬 Bình luận về các tính năng
 - 🔄 Đề xuất tính năng mới từ người dùng
+- 📧 Thông báo email khi đề xuất được duyệt/từ chối
 - 📱 Giao diện thân thiện với thiết bị di động
 - 🛡️ Bảo vệ reCAPTCHA v3 (chống spam)
 
@@ -24,7 +25,7 @@ Hệ thống bình chọn tính năng đa ngôn ngữ (Tiếng Anh và Tiếng V
 - **Hosting**: Cloudflare Pages (frontend) + Cloudflare Workers (API)
 - **CI/CD**: GitHub Actions
 - **Thông báo**: Telegram Bot API (tùy chọn)
-- **Email**: Resend API (tùy chọn)
+- **Email**: Resend API hoặc SendGrid (tùy chọn, để thông báo người dùng)
 - **Bảo mật**: Google reCAPTCHA v3 (chống spam)
 
 ## Cấu trúc dự án

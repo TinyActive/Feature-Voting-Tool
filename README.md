@@ -14,6 +14,7 @@ A multilingual feature voting system (English and Vietnamese) that allows users 
 - 📊 Statistics and analytics
 - 💬 Comments on features
 - 🔄 New feature suggestions from users
+- 📧 Email notifications for suggestion approvals/rejections
 - 📱 Mobile-friendly interface
 - 🛡️ reCAPTCHA v3 protection (spam prevention)
 
@@ -24,7 +25,7 @@ A multilingual feature voting system (English and Vietnamese) that allows users 
 - **Hosting**: Cloudflare Pages (frontend) + Cloudflare Workers (API)
 - **CI/CD**: GitHub Actions
 - **Notifications**: Telegram Bot API (optional)
-- **Email**: Resend API (optional)
+- **Email**: Resend API or SendGrid (optional, for user notifications)
 - **Security**: Google reCAPTCHA v3 (spam protection)
 
 ## Project Structure
@@ -199,7 +200,8 @@ Secret environment variables (set with `wrangler secret put`):
 - `RECAPTCHA_SECRET_KEY`: reCAPTCHA v3 secret key (required)
 - `TELEGRAM_BOT_TOKEN`: Telegram bot token (optional)
 - `TELEGRAM_CHAT_ID`: Telegram chat ID (optional)
-- `RESEND_API_KEY`: API key for Resend email service (optional)
+- `RESEND_API_KEY`: API key for Resend email service (optional, for user notifications)
+- `SENDGRID_API_KEY`: API key for SendGrid email service (optional, alternative to Resend)
 - `TURNSTILE_SECRET_KEY`: Secret key for Cloudflare Turnstile (optional, anti-spam)
 
 ## Deployment
@@ -308,6 +310,28 @@ See [RECAPTCHA_SETUP.md](RECAPTCHA_SETUP.md) for detailed setup instructions, in
 - reCAPTCHA v3 requires HTTPS in production
 - Add your domains to the reCAPTCHA admin console
 - Include privacy notice: "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply."
+
+### Email Notifications
+
+The system automatically sends email notifications to users when their feature suggestions are approved or rejected by admins.
+
+**Supported Email Services:**
+- **Resend** (recommended) - Modern email API with 3,000 emails/month free tier
+- **SendGrid** - Popular email service with 100 emails/day free tier
+
+**Setup Instructions:**
+
+See [EMAIL_SETUP.md](EMAIL_SETUP.md) for detailed setup instructions, including:
+- How to configure Resend or SendGrid
+- Email template customization
+- Testing and troubleshooting
+- Security best practices
+
+**Email Templates:**
+- ✅ **Approval Email**: Sent when a suggestion is approved and converted to a feature
+- ✅ **Rejection Email**: Sent when a suggestion is rejected with helpful feedback
+
+Both templates are bilingual (English/Vietnamese) with beautiful HTML design and plain text fallback.
 
 ## Customization
 

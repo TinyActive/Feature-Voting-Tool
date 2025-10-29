@@ -4,6 +4,7 @@ import { verifyUserSession } from './auth'
 import { verifyAdminToken } from '../middleware/auth'
 import { createFeature } from '../db/queries'
 import { verifyRecaptcha } from '../utils/recaptcha'
+import { sendEmail, generateSuggestionApprovedEmail, generateSuggestionRejectedEmail } from '../utils/email'
 
 // Helper functions to reduce duplication
 function jsonResponse(data: any, status = 200): Response {
@@ -245,6 +246,34 @@ export async function handleApproveSuggestion(request: Request, env: Env): Promi
 
     await updateSuggestionStatus(env, suggestionId!, 'approved', feature.id)
 
+    // Get user email to send notification
+    const userResult = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
+      .bind(suggestion.user_id)
+      .first()
+
+    if (userResult && userResult.email) {
+      try {
+        const featureUrl = `${env.APP_URL}/#feature-${feature.id}`
+        const emailContent = generateSuggestionApprovedEmail(
+          suggestion.title_en as string,
+          suggestion.title_vi as string,
+          featureUrl
+        )
+
+        await sendEmail(env, {
+          to: userResult.email as string,
+          subject: '🎉 Your Feature Suggestion Has Been Approved!',
+          html: emailContent.html,
+          text: emailContent.text,
+        })
+
+        console.log(`✅ Approval email sent to ${userResult.email}`)
+      } catch (emailError: any) {
+        // Log error but don't fail the request
+        console.error('Failed to send approval email:', emailError)
+      }
+    }
+
     return jsonResponse({ 
       success: true, 
       feature,
@@ -269,7 +298,37 @@ export async function handleRejectSuggestion(request: Request, env: Env): Promis
     const idError = validateIdParam(suggestionId, 'Suggestion ID')
     if (idError) return idError
 
+    const { suggestion, error: fetchError } = await getSuggestionById(env, suggestionId!)
+    if (fetchError) return fetchError
+
     await updateSuggestionStatus(env, suggestionId!, 'rejected')
+
+    // Get user email to send notification
+    const userResult = await env.DB.prepare('SELECT email FROM users WHERE id = ?')
+      .bind(suggestion.user_id)
+      .first()
+
+    if (userResult && userResult.email) {
+      try {
+        const emailContent = generateSuggestionRejectedEmail(
+          suggestion.title_en as string,
+          suggestion.title_vi as string,
+          env.APP_URL
+        )
+
+        await sendEmail(env, {
+          to: userResult.email as string,
+          subject: '📋 Update on Your Feature Suggestion',
+          html: emailContent.html,
+          text: emailContent.text,
+        })
+
+        console.log(`✅ Rejection email sent to ${userResult.email}`)
+      } catch (emailError: any) {
+        // Log error but don't fail the request
+        console.error('Failed to send rejection email:', emailError)
+      }
+    }
 
     return jsonResponse({ 
       success: true,
