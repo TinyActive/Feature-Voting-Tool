@@ -45,7 +45,7 @@ echo "Step 2: Adding admin email to whitelist..."
 SQL="INSERT OR IGNORE INTO admin_emails (email, added_at, added_by) 
 VALUES ('$ADMIN_EMAIL', $(date +%s)000, 'system');"
 
-echo "$SQL" | wrangler d1 execute DB --command="$SQL"
+wrangler d1 execute DB --command="$SQL"
 
 if [ $? -eq 0 ]; then
     echo "✓ Admin email added successfully"
