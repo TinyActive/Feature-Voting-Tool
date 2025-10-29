@@ -87,6 +87,7 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
       })
 
       setFormData({ titleEn: '', titleVi: '', descEn: '', descVi: '' })
+      onSuccess()
       onClose()
     } catch (error: any) {
       toast({
