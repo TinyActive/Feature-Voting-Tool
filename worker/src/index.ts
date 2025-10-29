@@ -24,6 +24,12 @@ import {
   handleDeleteComment,
 } from "./handlers/comments";
 import {
+  handleGetAllComments,
+  handleUpdateCommentStatus,
+  handleDeleteCommentPermanently,
+  handleGetCommentStats,
+} from "./handlers/comment-moderation";
+import {
   handleGetUsers,
   handleUpdateUserRole,
   handleUpdateUserStatus,
@@ -145,7 +151,7 @@ export default {
         return await handleRejectSuggestion(request, env);
       }
 
-      // Comment endpoints
+      // Comment endpoints (Public)
       if (
         path.match(/^\/api\/features\/[^/]+\/comments$/) &&
         request.method === "GET"
@@ -169,6 +175,61 @@ export default {
         request.method === "DELETE"
       ) {
         return await handleDeleteComment(request, env);
+      }
+
+      // Comment moderation endpoints (Admin/Moderator only)
+      if (path === "/api/admin/comments" && request.method === "GET") {
+        return await handleGetAllComments(request, env);
+      }
+
+      if (path === "/api/admin/comments/stats" && request.method === "GET") {
+        return await handleGetCommentStats(request, env);
+      }
+
+      if (
+        path.match(/^\/api\/admin\/comments\/[^/]+\/status$/) &&
+        request.method === "PUT"
+      ) {
+        return await handleUpdateCommentStatus(request, env);
+      }
+
+      if (
+        path.match(/^\/api\/admin\/comments\/[^/]+\/hide$/) &&
+        request.method === "POST"
+      ) {
+        // Hide comment shortcut
+        const commentId = path.split("/")[4];
+        return await fetch(
+          `${request.url.split("/api/")[0]}/api/admin/comments/${commentId}/status`,
+          {
+            method: "PUT",
+            headers: request.headers,
+            body: JSON.stringify({ status: "hidden" }),
+          },
+        );
+      }
+
+      if (
+        path.match(/^\/api\/admin\/comments\/[^/]+\/show$/) &&
+        request.method === "POST"
+      ) {
+        // Show comment shortcut
+        const commentId = path.split("/")[4];
+        return await fetch(
+          `${request.url.split("/api/")[0]}/api/admin/comments/${commentId}/status`,
+          {
+            method: "PUT",
+            headers: request.headers,
+            body: JSON.stringify({ status: "active" }),
+          },
+        );
+      }
+
+      if (
+        path.match(/^\/api\/admin\/comments\/[^/]+$/) &&
+        request.method === "DELETE"
+      ) {
+        return await handleDeleteCommentPermanently(request, env);
       }
 
       // User management endpoints (Admin only)
