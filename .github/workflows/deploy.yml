@@ -75,11 +75,8 @@ jobs:
       - name: Run Database Migrations
         working-directory: ./worker
         run: |
-          echo "Running base schema..."
-          npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
-          
           echo "Running migration for admin comments..."
-          # Run migration but ignore error if column already exists (safe - no data loss)
+          # Run migration first (adds is_admin column if not exists)
           npx wrangler d1 execute feature-voting-db --file=./src/db/migration-add-admin-comments.sql --remote 2>&1 | tee migration.log || true
           
           # Check if migration succeeded or column already exists
@@ -90,6 +87,9 @@ jobs:
           else
             echo "✓ Migration completed successfully"
           fi
+          
+          echo "Running base schema to ensure all tables exist..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CF_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL }}
