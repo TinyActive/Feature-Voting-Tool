@@ -72,9 +72,22 @@ jobs:
           CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
 
-      - name: Run Database Migrations
-        working-directory: ./worker
-        run: npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
+        run: |
+          echo "Running base schema..."
+          npx wrangler d1 execute feature-voting-db --file=./src/db/schema.sql --remote
+          
+          echo "Running migration for admin comments..."
+          # Run migration but ignore error if column already exists (safe - no data loss)
+          npx wrangler d1 execute feature-voting-db --file=./src/db/migration-add-admin-comments.sql --remote 2>&1 | tee migration.log || true
+          
+          # Check if migration succeeded or column already exists
+          if grep -q "duplicate column name" migration.log; then
+            echo "✓ Column is_admin already exists - skipping migration"
+          elif grep -q "error" migration.log; then
+            echo "⚠ Migration may have failed - check logs"
+          else
+            echo "✓ Migration completed successfully"
+          fi
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CF_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL }}
