@@ -127,8 +127,7 @@ If legitimate users are blocked:
 Add this to your privacy policy:
 
 ```
-This site is protected by reCAPTCHA and the Google Privacy Policy 
-and Terms of Service apply.
+This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.
 ```
 
 ## Links
