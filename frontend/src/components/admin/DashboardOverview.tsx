@@ -21,12 +21,6 @@ import { Badge } from "@/components/ui/badge";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8787";
 
-interface Stats {
-  totalFeatures: number;
-  totalVotes: number;
-  topFeature: any;
-}
-
 interface DashboardData {
   users: {
     total: number;
