@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
+import { useRecaptcha } from '@/hooks/useRecaptcha'
 
 interface FeatureFormProps {
   token: string
@@ -25,6 +26,7 @@ interface FeatureFormProps {
 export default function FeatureForm({ token, feature, onClose, onSuccess }: FeatureFormProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { executeRecaptcha } = useRecaptcha()
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     titleEn: feature?.title.en || '',
@@ -48,9 +50,13 @@ export default function FeatureForm({ token, feature, onClose, onSuccess }: Feat
     try {
       setSubmitting(true)
       
+      // Get reCAPTCHA token
+      const recaptchaToken = await executeRecaptcha(feature ? 'admin_update_feature' : 'admin_create_feature')
+      
       const payload = {
         title: { en: formData.titleEn, vi: formData.titleVi },
         description: { en: formData.descEn, vi: formData.descVi },
+        recaptchaToken,
       }
 
       if (feature) {

@@ -9,29 +9,65 @@ import {
 import { corsHeaders } from '../utils/cors'
 import { verifyAdminToken } from '../middleware/auth'
 import { sendTelegramNotification } from '../utils/telegram'
+import { verifyRecaptcha } from '../utils/recaptcha'
+
+// Helper functions to reduce duplication
+function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+function extractFeatureId(request: Request): string | null {
+  const url = new URL(request.url)
+  return url.pathname.split('/').pop() || null
+}
+
+async function verifyRecaptchaToken(
+  token: string,
+  env: Env,
+  action: string
+): Promise<Response | null> {
+  const result = await verifyRecaptcha(token, env, action)
+  if (!result.success) {
+    return jsonResponse(
+      { error: result.error || 'Security verification failed' },
+      400
+    )
+  }
+  return null
+}
+
+function verifyAdmin(request: Request, env: Env): Response | null {
+  const authResult = verifyAdminToken(request, env)
+  if (!authResult.authorized) {
+    return jsonResponse({ error: 'Unauthorized' }, 401)
+  }
+  return null
+}
 
 export async function handleAdminFeatures(
   request: Request,
   env: Env,
   action: 'create' | 'update' | 'delete'
 ): Promise<Response> {
-  // Verify admin token
-  const authResult = verifyAdminToken(request, env)
-  if (!authResult.authorized) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
 
   try {
     if (action === 'create') {
       const body: any = await request.json()
+      
+      const recaptchaError = await verifyRecaptchaToken(
+        body.recaptchaToken,
+        env,
+        'admin_create_feature'
+      )
+      if (recaptchaError) return recaptchaError
+      
       if (!body.title?.en || !body.title?.vi) {
-        return new Response(JSON.stringify({ error: 'Title (en and vi) required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return jsonResponse({ error: 'Title (en and vi) required' }, 400)
       }
 
       const feature = await createFeature(env, {
@@ -39,99 +75,74 @@ export async function handleAdminFeatures(
         description: body.description || { en: '', vi: '' },
       })
 
-      // Send notification
       await sendTelegramNotification(
         env,
         `✨ New feature added: "${feature.title.en}"`
       )
 
-      return new Response(JSON.stringify(feature), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse(feature)
     }
 
     if (action === 'update') {
-      const url = new URL(request.url)
-      const featureId = url.pathname.split('/').pop()
-
+      const featureId = extractFeatureId(request)
       if (!featureId) {
-        return new Response(JSON.stringify({ error: 'Feature ID required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return jsonResponse({ error: 'Feature ID required' }, 400)
       }
 
       const body: any = await request.json()
+      
+      const recaptchaError = await verifyRecaptchaToken(
+        body.recaptchaToken,
+        env,
+        'admin_update_feature'
+      )
+      if (recaptchaError) return recaptchaError
+      
       await updateFeature(env, featureId, body)
-
       const updated = await getFeatureById(env, featureId)
-      return new Response(JSON.stringify(updated), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse(updated)
     }
 
     if (action === 'delete') {
-      const url = new URL(request.url)
-      const featureId = url.pathname.split('/').pop()
-
+      const featureId = extractFeatureId(request)
       if (!featureId) {
-        return new Response(JSON.stringify({ error: 'Feature ID required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return jsonResponse({ error: 'Feature ID required' }, 400)
       }
 
       await deleteFeature(env, featureId)
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ success: true })
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ error: 'Invalid action' }, 400)
   } catch (error: any) {
     console.error('Admin action error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to process request' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to process request' },
+      500
+    )
   }
 }
 
 export async function handleAdminStats(request: Request, env: Env): Promise<Response> {
-  // Verify admin token
-  const authResult = verifyAdminToken(request, env)
-  if (!authResult.authorized) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  const authError = verifyAdmin(request, env)
+  if (authError) return authError
 
   try {
     const features = await getAllFeatures(env)
-
     const totalFeatures = features.length
     const totalVotes = features.reduce((sum, f) => sum + f.votesUp + f.votesDown, 0)
     const topFeature = features.length > 0 ? features[0] : null
 
-    return new Response(
-      JSON.stringify({
-        totalFeatures,
-        totalVotes,
-        topFeature,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+    return jsonResponse({
+      totalFeatures,
+      totalVotes,
+      topFeature,
+    })
   } catch (error: any) {
     console.error('Stats error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Failed to fetch stats' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(
+      { error: error.message || 'Failed to fetch stats' },
+      500
+    )
   }
 }

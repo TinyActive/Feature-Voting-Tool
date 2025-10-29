@@ -16,12 +16,14 @@ id = "${CF_KV_NAMESPACE_ID}"
 # Environment variables (non-sensitive)
 [vars]
 APP_URL = "https://idea.nginxwaf.me"
+RECAPTCHA_SITE_KEY = ""
 
 # Secrets (NEVER commit these - set via wrangler secret put or GitHub Secrets)
 # ADMIN_TOKEN - Admin authentication token
 # TELEGRAM_BOT_TOKEN - Telegram bot token for notifications
 # TELEGRAM_CHAT_ID - Telegram chat ID for notifications
 # RESEND_API_KEY - Resend email service API key
+# RECAPTCHA_SECRET_KEY - Google reCAPTCHA v3 secret key
 
 [build]
 command = "npm install && npx tsc"

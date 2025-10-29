@@ -15,6 +15,7 @@ A multilingual feature voting system (English and Vietnamese) that allows users 
 - 💬 Comments on features
 - 🔄 New feature suggestions from users
 - 📱 Mobile-friendly interface
+- 🛡️ reCAPTCHA v3 protection (spam prevention)
 
 ## Architecture
 
@@ -24,6 +25,7 @@ A multilingual feature voting system (English and Vietnamese) that allows users 
 - **CI/CD**: GitHub Actions
 - **Notifications**: Telegram Bot API (optional)
 - **Email**: Resend API (optional)
+- **Security**: Google reCAPTCHA v3 (spam protection)
 
 ## Project Structure
 
@@ -113,6 +115,10 @@ This script will create:
 npx wrangler secret put ADMIN_TOKEN
 # Enter your admin token
 
+# reCAPTCHA v3 (required for spam protection)
+npx wrangler secret put RECAPTCHA_SECRET_KEY
+# Enter your reCAPTCHA secret key from https://www.google.com/recaptcha/admin
+
 # If you want notifications via Telegram (optional)
 npx wrangler secret put TELEGRAM_BOT_TOKEN
 npx wrangler secret put TELEGRAM_CHAT_ID
@@ -148,16 +154,19 @@ The frontend will run at http://localhost:5173 and the worker backend will run a
 
 ```
 VITE_API_URL=http://localhost:8787  # Worker API URL (local development)
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key  # reCAPTCHA v3 site key
 ```
 
 In production, `VITE_API_URL` should be set to the deployed worker URL, for example:
 ```
 VITE_API_URL=https://feature-voting-worker.yourdomain.workers.dev
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 Or if you use a custom domain:
 ```
 VITE_API_URL=https://api.idea.yourdomain.com
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 ### Backend (wrangler.toml and secrets)
@@ -165,11 +174,13 @@ VITE_API_URL=https://api.idea.yourdomain.com
 Configuration in wrangler.toml:
 - `name`: Worker name
 - `APP_URL`: Frontend URL
+- `RECAPTCHA_SITE_KEY`: reCAPTCHA v3 public site key
 - `database_id`: D1 database ID
 - `id`: KV namespace ID
 
 Secret environment variables (set with `wrangler secret put`):
 - `ADMIN_TOKEN`: Admin authentication token
+- `RECAPTCHA_SECRET_KEY`: reCAPTCHA v3 secret key (required)
 - `TELEGRAM_BOT_TOKEN`: Telegram bot token (optional)
 - `TELEGRAM_CHAT_ID`: Telegram chat ID (optional)
 - `RESEND_API_KEY`: API key for Resend email service (optional)
@@ -191,6 +202,8 @@ Add the following secrets to your GitHub repository:
 | `CF_D1_DATABASE_ID` | D1 database ID (Get from Cloudflare Dashboard > Workers & Pages > D1 > Database > Database ID) | Required |
 | `CF_KV_NAMESPACE_ID` | KV namespace ID (Get from Cloudflare Dashboard > Workers & Pages > KV > Namespace ID) | Required |
 | `ADMIN_TOKEN` | Admin token (Create a secure random string) | Required |
+| `RECAPTCHA_SITE_KEY` | reCAPTCHA v3 site key (Get from https://www.google.com/recaptcha/admin) | Required |
+| `RECAPTCHA_SECRET_KEY` | reCAPTCHA v3 secret key (Get from https://www.google.com/recaptcha/admin) | Required |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token (Get from BotFather on Telegram) | Optional |
 | `TELEGRAM_CHAT_ID` | Telegram chat ID (ID of the chat or channel to receive notifications) | Optional |
 | `RESEND_API_KEY` | Resend API key (Get from Resend.com website) | Optional |
@@ -214,6 +227,14 @@ Add the following secrets to your GitHub repository:
    - In Cloudflare Dashboard, go to Workers & Pages > KV
    - Create a new namespace or select an existing one
    - The ID will be displayed in the namespace list
+
+4. **RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY**:
+   - Go to [Google reCAPTCHA Admin Console](https://www.google.com/recaptcha/admin)
+   - Click "+" to register a new site
+   - Select "reCAPTCHA v3"
+   - Add your domains (e.g., `idea.nginxwaf.me`, `localhost` for testing)
+   - After registration, copy the **Site Key** (public) and **Secret Key** (private)
+   - Add both keys to GitHub Secrets
 
 ### Manual Deployment
 
@@ -240,6 +261,37 @@ The project uses Cloudflare D1 (SQLite) with the following tables:
 - `votes`: Stores votes
 
 The full schema can be found in `worker/src/db/schema.sql`.
+
+## Security Features
+
+### reCAPTCHA v3 Integration
+
+This application uses Google reCAPTCHA v3 to protect against spam and abuse. All form submissions are protected:
+
+- ✅ User login (magic link requests)
+- ✅ Voting (upvote/downvote)
+- ✅ Feature suggestions
+- ✅ Comments
+- ✅ Admin actions (create/update features)
+
+**Key Features:**
+- **Hidden Badge**: The reCAPTCHA badge is completely hidden to avoid UI interference
+- **Score-based**: Uses risk analysis scores (0.0 = bot, 1.0 = human)
+- **Configurable Threshold**: Default minimum score is 0.5 (adjustable in `worker/src/utils/recaptcha.ts`)
+- **Graceful Degradation**: If keys are not configured, verification is skipped with a warning
+
+**Setup Instructions:**
+
+See [RECAPTCHA_SETUP.md](RECAPTCHA_SETUP.md) for detailed setup instructions, including:
+- How to get reCAPTCHA keys
+- Configuration steps
+- Troubleshooting guide
+- Privacy notice requirements
+
+**Important Notes:**
+- reCAPTCHA v3 requires HTTPS in production
+- Add your domains to the reCAPTCHA admin console
+- Include privacy notice: "This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply."
 
 ## Customization
 

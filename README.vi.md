@@ -15,6 +15,7 @@ Hệ thống bình chọn tính năng đa ngôn ngữ (Tiếng Anh và Tiếng V
 - 💬 Bình luận về các tính năng
 - 🔄 Đề xuất tính năng mới từ người dùng
 - 📱 Giao diện thân thiện với thiết bị di động
+- 🛡️ Bảo vệ reCAPTCHA v3 (chống spam)
 
 ## Kiến trúc
 
@@ -24,6 +25,7 @@ Hệ thống bình chọn tính năng đa ngôn ngữ (Tiếng Anh và Tiếng V
 - **CI/CD**: GitHub Actions
 - **Thông báo**: Telegram Bot API (tùy chọn)
 - **Email**: Resend API (tùy chọn)
+- **Bảo mật**: Google reCAPTCHA v3 (chống spam)
 
 ## Cấu trúc dự án
 
@@ -113,6 +115,10 @@ Script này sẽ tạo:
 npx wrangler secret put ADMIN_TOKEN
 # Nhập token quản trị viên của bạn
 
+# reCAPTCHA v3 (bắt buộc để chống spam)
+npx wrangler secret put RECAPTCHA_SECRET_KEY
+# Nhập secret key reCAPTCHA từ https://www.google.com/recaptcha/admin
+
 # Nếu bạn muốn thông báo qua Telegram (tùy chọn)
 npx wrangler secret put TELEGRAM_BOT_TOKEN
 npx wrangler secret put TELEGRAM_CHAT_ID
@@ -148,16 +154,19 @@ Frontend sẽ chạy tại http://localhost:5173 và worker backend sẽ chạy 
 
 ```
 VITE_API_URL=http://localhost:8787  # URL của worker API (local development)
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key  # Site key reCAPTCHA v3
 ```
 
 Trong production, `VITE_API_URL` nên được đặt thành URL của worker đã triển khai, ví dụ:
 ```
 VITE_API_URL=https://feature-voting-worker.yourdomain.workers.dev
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 Hoặc nếu bạn sử dụng tên miền tùy chỉnh:
 ```
 VITE_API_URL=https://api.idea.yourdomain.com
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
 ```
 
 ### Backend (wrangler.toml và secrets)
@@ -165,11 +174,13 @@ VITE_API_URL=https://api.idea.yourdomain.com
 Cấu hình trong wrangler.toml:
 - `name`: Tên của worker
 - `APP_URL`: URL của frontend
+- `RECAPTCHA_SITE_KEY`: Site key công khai reCAPTCHA v3
 - `database_id`: ID của D1 database
 - `id`: ID của KV namespace
 
 Biến môi trường bí mật (đặt bằng `wrangler secret put`):
 - `ADMIN_TOKEN`: Token xác thực quản trị viên
+- `RECAPTCHA_SECRET_KEY`: Secret key reCAPTCHA v3 (bắt buộc)
 - `TELEGRAM_BOT_TOKEN`: Token bot Telegram (tùy chọn)
 - `TELEGRAM_CHAT_ID`: ID chat Telegram (tùy chọn)
 - `RESEND_API_KEY`: API key cho dịch vụ email Resend (tùy chọn)
@@ -188,6 +199,8 @@ Thêm các secrets sau vào repository GitHub của bạn:
 - `CF_D1_DATABASE_ID`: ID của D1 database (Lấy từ Cloudflare Dashboard > Workers & Pages > D1 > Database > Database ID)
 - `CF_KV_NAMESPACE_ID`: ID của KV namespace (Lấy từ Cloudflare Dashboard > Workers & Pages > KV > Namespace ID)
 - `ADMIN_TOKEN`: Token quản trị viên (Tự tạo một chuỗi ngẫu nhiên an toàn)
+- `RECAPTCHA_SITE_KEY`: Site key reCAPTCHA v3 (Lấy từ https://www.google.com/recaptcha/admin)
+- `RECAPTCHA_SECRET_KEY`: Secret key reCAPTCHA v3 (Lấy từ https://www.google.com/recaptcha/admin)
 - `TELEGRAM_BOT_TOKEN`: Token bot Telegram (Lấy từ BotFather trên Telegram, tùy chọn)
 - `TELEGRAM_CHAT_ID`: ID chat Telegram (ID của chat hoặc channel để nhận thông báo, tùy chọn)
 - `RESEND_API_KEY`: API key Resend (Lấy từ trang web Resend.com, tùy chọn)
@@ -211,6 +224,14 @@ Thêm các secrets sau vào repository GitHub của bạn:
    - Trong Cloudflare Dashboard, đi đến Workers & Pages > KV
    - Tạo namespace mới hoặc chọn namespace hiện có
    - ID sẽ hiển thị trong danh sách namespace
+
+4. **RECAPTCHA_SITE_KEY và RECAPTCHA_SECRET_KEY**:
+   - Truy cập [Google reCAPTCHA Admin Console](https://www.google.com/recaptcha/admin)
+   - Nhấp "+" để đăng ký trang web mới
+   - Chọn "reCAPTCHA v3"
+   - Thêm các tên miền của bạn (ví dụ: `idea.nginxwaf.me`, `localhost` để test)
+   - Sau khi đăng ký, sao chép **Site Key** (công khai) và **Secret Key** (bí mật)
+   - Thêm cả hai key vào GitHub Secrets
 
 ### Triển khai thủ công
 
@@ -237,6 +258,37 @@ Dự án sử dụng Cloudflare D1 (SQLite) với các bảng sau:
 - `votes`: Lưu trữ phiếu bầu
 
 Schema đầy đủ có thể được tìm thấy trong `worker/src/db/schema.sql`.
+
+## Tính năng bảo mật
+
+### Tích hợp reCAPTCHA v3
+
+Ứng dụng này sử dụng Google reCAPTCHA v3 để bảo vệ chống spam và lạm dụng. Tất cả các form gửi đều được bảo vệ:
+
+- Đăng nhập người dùng (yêu cầu magic link)
+- Bình chọn (ủng hộ/không ủng hộ)
+- Đề xuất tính năng
+- Bình luận
+- Hành động quản trị (tạo/cập nhật tính năng)
+
+**Tính năng chính:**
+- **Ẩn Badge**: Badge reCAPTCHA được ẩn hoàn toàn để tránh ảnh hưởng giao diện
+- **Dựa trên điểm số**: Sử dụng điểm phân tích rủi ro (0.0 = bot, 1.0 = người thật)
+- **Ngưỡng có thể cấu hình**: Điểm tối thiểu mặc định là 0.5 (có thể điều chỉnh trong `worker/src/utils/recaptcha.ts`)
+- **Giảm tải nhẹ nhàng**: Nếu key chưa được cấu hình, xác minh sẽ bị bỏ qua với cảnh báo
+
+**Hướng dẫn cài đặt:**
+
+Xem [RECAPTCHA_SETUP.md](RECAPTCHA_SETUP.md) để biết hướng dẫn cài đặt chi tiết, bao gồm:
+- Cách lấy key reCAPTCHA
+- Các bước cấu hình
+- Hướng dẫn khắc phục sự cố
+- Yêu cầu thông báo quyền riêng tư
+
+**Lưu ý quan trọng:**
+- reCAPTCHA v3 yêu cầu HTTPS trong môi trường production
+- Thêm tên miền của bạn vào bảng điều khiển quản trị reCAPTCHA
+- Bao gồm thông báo quyền riêng tư: "Trang web này được bảo vệ bởi reCAPTCHA và Chính sách quyền riêng tư cũng như Điều khoản dịch vụ của Google được áp dụng."
 
 ## Tùy chỉnh
 

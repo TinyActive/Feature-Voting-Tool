@@ -34,6 +34,7 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: https://feature-voting-worker.steep-morning-8706.workers.dev
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}
 
       - name: Deploy to Cloudflare Pages
         working-directory: ./frontend
@@ -86,6 +87,7 @@ jobs:
           echo "${{ secrets.RESEND_API_KEY }}" | npx wrangler secret put RESEND_API_KEY
           echo "${{ secrets.TELEGRAM_BOT_TOKEN }}" | npx wrangler secret put TELEGRAM_BOT_TOKEN
           echo "${{ secrets.TELEGRAM_CHAT_ID }}" | npx wrangler secret put TELEGRAM_CHAT_ID
+          echo "${{ secrets.RECAPTCHA_SECRET_KEY }}" | npx wrangler secret put RECAPTCHA_SECRET_KEY
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CF_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CF_EMAIL }}
@@ -101,6 +103,7 @@ jobs:
           CF_D1_DATABASE_ID: ${{ secrets.CF_D1_DATABASE_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
           APP_URL: ${{ secrets.APP_URL || 'https://idea.nginxwaf.me' }}
+          RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}
 
   notify:
     name: Send Telegram Notification
