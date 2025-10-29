@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { LogIn } from "lucide-react";
 import HomePage from "./components/HomePage";
@@ -13,15 +19,18 @@ import { useAuth } from "./contexts/AuthContext";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/toaster";
 
-function App() {
+function AppContent() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+  const location = useLocation();
+
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-background">
-        {/* Header */}
+    <div className="min-h-screen bg-background">
+      {/* Header - Hide on admin routes */}
+      {!isAdminRoute && (
         <header className="border-b">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link to="/" className="text-2xl font-bold text-primary">
@@ -46,32 +55,37 @@ function App() {
             </nav>
           </div>
         </header>
+      )}
 
-        {/* Main Content */}
-        <main
-          className={
-            window.location.pathname.startsWith("/admin")
-              ? ""
-              : "container mx-auto px-4 py-8"
-          }
-        >
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/feature/:id" element={<FeatureDetail />} />
-            <Route path="/admin/*" element={<AdminPage />} />
-            <Route path="/auth/verify" element={<AuthVerify />} />
-          </Routes>
-        </main>
+      {/* Main Content - No container for admin routes */}
+      <main className={isAdminRoute ? "" : "container mx-auto px-4 py-8"}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/feature/:id" element={<FeatureDetail />} />
+          <Route path="/admin/*" element={<AdminPage />} />
+          <Route path="/auth/verify" element={<AuthVerify />} />
+        </Routes>
+      </main>
 
-        {/* Footer */}
+      {/* Footer - Hide on admin routes */}
+      {!isAdminRoute && (
         <footer className="border-t mt-16">
           <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
             <p>{t("app.tagline")}</p>
           </div>
         </footer>
-      </div>
+      )}
+
       <Toaster />
       <LoginModal open={showLogin} onClose={() => setShowLogin(false)} />
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

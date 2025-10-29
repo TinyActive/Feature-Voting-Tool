@@ -16,6 +16,7 @@ import {
   ThumbsDown,
   Activity,
   BarChart3,
+  AlertCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -198,12 +199,12 @@ export default function DashboardOverview() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">
-          Dashboard Overview
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold tracking-tight mb-2">
+          Welcome back!
         </h2>
-        <p className="text-muted-foreground mt-2">
-          Welcome back! Here's what's happening with your platform.
+        <p className="text-muted-foreground">
+          Here's what's happening with your platform today.
         </p>
       </div>
 
@@ -249,7 +250,7 @@ export default function DashboardOverview() {
             <div className="flex items-center gap-2 mt-2">
               <Badge
                 variant="secondary"
-                className="bg-green-100 text-green-700"
+                className="bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
               >
                 <ThumbsUp className="w-3 h-3 mr-1" />
                 Active
@@ -297,8 +298,9 @@ export default function DashboardOverview() {
               {dashboardData.suggestions.pending > 0 && (
                 <Badge
                   variant="secondary"
-                  className="bg-yellow-100 text-yellow-700"
+                  className="bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
                 >
+                  <AlertCircle className="w-3 h-3 mr-1" />
                   Needs attention
                 </Badge>
               )}
@@ -307,7 +309,7 @@ export default function DashboardOverview() {
         </Card>
       </div>
 
-      {/* Activity Summary */}
+      {/* Activity & Top Feature Section */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Platform Activity */}
         <Card>
@@ -341,7 +343,7 @@ export default function DashboardOverview() {
         </Card>
 
         {/* Top Feature */}
-        {dashboardData.features.topFeature && (
+        {dashboardData.features.topFeature ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -383,40 +385,56 @@ export default function DashboardOverview() {
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Pending Actions */}
-        {dashboardData.suggestions.pending > 0 && (
-          <Card className="md:col-span-2">
+        ) : (
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-700">
-                <Lightbulb className="w-5 h-5" />
-                Pending Actions Required
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Most Popular Feature
               </CardTitle>
-              <CardDescription>Items that need your attention</CardDescription>
+              <CardDescription>Feature with the most votes</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
-                <div>
-                  <p className="font-medium">
-                    {dashboardData.suggestions.pending} suggestion(s) awaiting
-                    review
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Review and approve or reject user-submitted feature
-                    suggestions
-                  </p>
-                </div>
-                <Badge className="bg-yellow-600 hover:bg-yellow-700">
-                  Action Required
-                </Badge>
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <TrendingUp className="w-12 h-12 mb-2 opacity-50" />
+                <p className="text-sm">No features yet</p>
               </div>
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Quick Stats */}
+      {/* Pending Actions Alert */}
+      {dashboardData.suggestions.pending > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+              <AlertCircle className="w-5 h-5" />
+              Pending Actions Required
+            </CardTitle>
+            <CardDescription>Items that need your attention</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 bg-yellow-100 dark:bg-yellow-950/40 rounded-lg">
+              <div>
+                <p className="font-medium text-yellow-900 dark:text-yellow-100">
+                  {dashboardData.suggestions.pending} suggestion(s) awaiting
+                  review
+                </p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                  Review and approve or reject user-submitted feature
+                  suggestions
+                </p>
+              </div>
+              <Badge className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                Action Required
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* User Role Distribution */}
       <Card>
         <CardHeader>
           <CardTitle>User Role Distribution</CardTitle>
@@ -425,28 +443,28 @@ export default function DashboardOverview() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-950/20">
-              <p className="text-sm font-medium text-muted-foreground">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="text-center p-6 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900">
+              <p className="text-sm font-medium text-muted-foreground mb-2">
                 Admins
               </p>
-              <p className="text-3xl font-bold text-red-700 dark:text-red-300">
+              <p className="text-4xl font-bold text-red-700 dark:text-red-300">
                 {dashboardData.users.admins}
               </p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div className="text-center p-6 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900">
+              <p className="text-sm font-medium text-muted-foreground mb-2">
                 Moderators
               </p>
-              <p className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+              <p className="text-4xl font-bold text-blue-700 dark:text-blue-300">
                 {dashboardData.users.moderators}
               </p>
             </div>
-            <div className="text-center p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div className="text-center p-6 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <p className="text-sm font-medium text-muted-foreground mb-2">
                 Regular Users
               </p>
-              <p className="text-3xl font-bold">
+              <p className="text-4xl font-bold text-gray-700 dark:text-gray-300">
                 {dashboardData.users.total -
                   dashboardData.users.admins -
                   dashboardData.users.moderators}
