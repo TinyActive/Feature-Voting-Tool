@@ -83,19 +83,24 @@ export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionF
         throw new Error('Failed to submit suggestion')
       }
 
+      // Reset form data first
+      setFormData({ titleEn: '', titleVi: '', descEn: '', descVi: '' })
+      
+      // Show success toast
       toast({
         title: `✅ ${t('suggestion.success.title')}`,
         description: t('suggestion.success.description'),
-        duration: 5000,
+        duration: 6000, // Show for 6 seconds
       })
 
-      setFormData({ titleEn: '', titleVi: '', descEn: '', descVi: '' })
-      
-      // Close form after a short delay to let user see the success message
+      // Close form after delay to let user see the success message
       setTimeout(() => {
-        onSuccess()
         onClose()
-      }, 500)
+        // Call onSuccess after closing to avoid any reload during toast display
+        setTimeout(() => {
+          onSuccess()
+        }, 100)
+      }, 1500) // Wait 1.5 seconds before closing
     } catch (error: any) {
       toast({
         title: `❌ ${t('suggestion.error.title')}`,

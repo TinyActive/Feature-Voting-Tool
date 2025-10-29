@@ -11,8 +11,9 @@ export default function SuggestFeatureButton() {
   if (!user) return null
 
   const handleSuccess = () => {
-    // Refresh the page to show updated suggestions
-    window.location.reload()
+    // Just close the form - no page reload
+    // User will see the success toast notification
+    setShowForm(false)
   }
 
   return (
