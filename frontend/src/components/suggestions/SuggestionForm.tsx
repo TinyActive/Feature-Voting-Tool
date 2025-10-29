@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,12 +9,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useRecaptcha } from '@/hooks/useRecaptcha'
-import { Loader2 } from 'lucide-react'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 
@@ -24,6 +25,7 @@ interface SuggestionFormProps {
 }
 
 export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionFormProps) {
+  const { t } = useTranslation()
   const { token } = useAuth()
   const { toast } = useToast()
   const { executeRecaptcha } = useRecaptcha()
