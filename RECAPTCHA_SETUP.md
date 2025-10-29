@@ -43,8 +43,8 @@ Add the following secrets to your GitHub repository:
 
 | Secret Name | Description | Example |
 |------------|-------------|---------|
-| `RECAPTCHA_SITE_KEY` | Public site key from Google reCAPTCHA | `6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI` |
-| `RECAPTCHA_SECRET_KEY` | Secret key from Google reCAPTCHA | `6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe` |
+| `RECAPTCHA_SITE_KEY` | Public site key from Google reCAPTCHA | `your-site-key-here` |
+| `RECAPTCHA_SECRET_KEY` | Secret key from Google reCAPTCHA | `your-secret-key-here` |
 
 ### 3. Update wrangler.toml (Local Development)
 
@@ -127,8 +127,7 @@ If legitimate users are blocked:
 Add this to your privacy policy:
 
 ```
-This site is protected by reCAPTCHA and the Google Privacy Policy 
-and Terms of Service apply.
+This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.
 ```
 
 ## Links
