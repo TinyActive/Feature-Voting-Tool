@@ -3,6 +3,7 @@ import { corsHeaders } from '../utils/cors'
 import { verifyUserSession } from './auth'
 import { verifyAdminToken } from '../middleware/auth'
 import { createFeature } from '../db/queries'
+import { verifyRecaptcha } from '../utils/recaptcha'
 
 interface Suggestion {
   id: string
@@ -33,6 +34,15 @@ export async function handleCreateSuggestion(request: Request, env: Env): Promis
     }
 
     const body: any = await request.json()
+    
+    // Verify reCAPTCHA
+    const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'suggest_feature')
+    if (!recaptchaResult.success) {
+      return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     
     if (!body.title?.en || !body.title?.vi) {
       return new Response(JSON.stringify({ error: 'Title (en and vi) required' }), {

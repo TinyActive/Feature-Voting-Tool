@@ -14,6 +14,7 @@ export interface Feature {
 export interface VoteRequest {
   voteType: 'up' | 'down'
   turnstileToken?: string
+  recaptchaToken?: string
 }
 
 export interface Stats {
@@ -61,7 +62,7 @@ function getAuthHeaders(token: string) {
 
 export async function createFeature(
   token: string,
-  feature: Omit<Feature, 'id' | 'votesUp' | 'votesDown' | 'createdAt' | 'updatedAt'>
+  feature: Omit<Feature, 'id' | 'votesUp' | 'votesDown' | 'createdAt' | 'updatedAt'> & { recaptchaToken?: string }
 ): Promise<Feature> {
   const response = await fetch(`${API_BASE_URL}/api/admin/features`, {
     method: 'POST',
@@ -79,7 +80,7 @@ export async function createFeature(
 export async function updateFeature(
   token: string,
   featureId: string,
-  feature: Partial<Feature>
+  feature: Partial<Feature> & { recaptchaToken?: string }
 ): Promise<Feature> {
   const response = await fetch(`${API_BASE_URL}/api/admin/features/${featureId}`, {
     method: 'PUT',

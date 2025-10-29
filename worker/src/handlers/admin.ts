@@ -9,6 +9,7 @@ import {
 import { corsHeaders } from '../utils/cors'
 import { verifyAdminToken } from '../middleware/auth'
 import { sendTelegramNotification } from '../utils/telegram'
+import { verifyRecaptcha } from '../utils/recaptcha'
 
 export async function handleAdminFeatures(
   request: Request,
@@ -27,6 +28,16 @@ export async function handleAdminFeatures(
   try {
     if (action === 'create') {
       const body: any = await request.json()
+      
+      // Verify reCAPTCHA
+      const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'admin_create_feature')
+      if (!recaptchaResult.success) {
+        return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      
       if (!body.title?.en || !body.title?.vi) {
         return new Response(JSON.stringify({ error: 'Title (en and vi) required' }), {
           status: 400,
@@ -62,6 +73,16 @@ export async function handleAdminFeatures(
       }
 
       const body: any = await request.json()
+      
+      // Verify reCAPTCHA
+      const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'admin_update_feature')
+      if (!recaptchaResult.success) {
+        return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      
       await updateFeature(env, featureId, body)
 
       const updated = await getFeatureById(env, featureId)

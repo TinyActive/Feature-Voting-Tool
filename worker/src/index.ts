@@ -14,6 +14,8 @@ export interface Env {
   TURNSTILE_SECRET_KEY?: string
   RESEND_API_KEY?: string
   SENDGRID_API_KEY?: string
+  RECAPTCHA_SECRET_KEY: string
+  RECAPTCHA_SITE_KEY: string
   APP_URL: string // e.g., https://idea.nginxwaf.me
 }
 

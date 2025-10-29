@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,21 +9,26 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
+import { useRecaptcha } from '@/hooks/useRecaptcha'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 
 interface SuggestionFormProps {
   open: boolean
   onClose: () => void
+  onSuccess: () => void
 }
 
-export default function SuggestionForm({ open, onClose }: SuggestionFormProps) {
+export default function SuggestionForm({ open, onClose, onSuccess }: SuggestionFormProps) {
+  const { t } = useTranslation()
   const { token } = useAuth()
   const { toast } = useToast()
+  const { executeRecaptcha } = useRecaptcha()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     titleEn: '',
@@ -56,6 +61,9 @@ export default function SuggestionForm({ open, onClose }: SuggestionFormProps) {
     try {
       setLoading(true)
 
+      // Get reCAPTCHA token
+      const recaptchaToken = await executeRecaptcha('suggest_feature')
+
       const response = await fetch(`${API_BASE_URL}/api/suggestions`, {
         method: 'POST',
         headers: {
@@ -65,6 +73,7 @@ export default function SuggestionForm({ open, onClose }: SuggestionFormProps) {
         body: JSON.stringify({
           title: { en: formData.titleEn, vi: formData.titleVi },
           description: { en: formData.descEn, vi: formData.descVi },
+          recaptchaToken,
         }),
       })
 

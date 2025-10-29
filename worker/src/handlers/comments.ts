@@ -1,6 +1,7 @@
 import { Env } from '../index'
 import { corsHeaders } from '../utils/cors'
 import { verifyUserSession } from './auth'
+import { verifyRecaptcha } from '../utils/recaptcha'
 
 interface Comment {
   id: string
@@ -111,6 +112,15 @@ export async function handleCreateComment(request: Request, env: Env): Promise<R
     }
 
     const body: any = await request.json()
+    
+    // Verify reCAPTCHA
+    const recaptchaResult = await verifyRecaptcha(body.recaptchaToken, env, 'create_comment')
+    if (!recaptchaResult.success) {
+      return new Response(JSON.stringify({ error: recaptchaResult.error || 'Security verification failed' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     
     if (!body.content || body.content.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'Content required' }), {
