@@ -12,29 +12,89 @@ declare global {
   }
 }
 
+// Track loading state globally to prevent multiple loads
+let recaptchaLoadPromise: Promise<void> | null = null
+
 /**
  * Load reCAPTCHA script dynamically
  */
 function loadRecaptchaScript(siteKey: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Check if script already exists
-    if (document.querySelector(`script[src*="recaptcha/api.js"]`)) {
-      if (window.grecaptcha) {
-        resolve()
-      } else {
-        reject(new Error('reCAPTCHA script loaded but grecaptcha not available'))
-      }
+  // Return existing promise if already loading
+  if (recaptchaLoadPromise) {
+    return recaptchaLoadPromise
+  }
+
+  recaptchaLoadPromise = new Promise((resolve, reject) => {
+    // Check if grecaptcha is already available
+    if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+      resolve()
       return
     }
 
+    // Check if script already exists
+    const existingScript = document.querySelector(`script[src*="recaptcha/api.js"]`)
+    if (existingScript) {
+      // Script exists, wait for grecaptcha to be ready
+      let resolved = false
+      const checkInterval = setInterval(() => {
+        if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+          if (!resolved) {
+            resolved = true
+            clearInterval(checkInterval)
+            resolve()
+          }
+        }
+      }, 100)
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          clearInterval(checkInterval)
+          reject(new Error('reCAPTCHA script timeout'))
+        }
+      }, 10000)
+      return
+    }
+
+    // Load new script
     const script = document.createElement('script')
     script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`
     script.async = true
     script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load reCAPTCHA script'))
+    
+    script.onload = () => {
+      // Wait for grecaptcha to be ready after script loads
+      let resolved = false
+      const checkReady = setInterval(() => {
+        if (window.grecaptcha && typeof window.grecaptcha.ready === 'function') {
+          if (!resolved) {
+            resolved = true
+            clearInterval(checkReady)
+            resolve()
+          }
+        }
+      }, 50)
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          clearInterval(checkReady)
+          reject(new Error('grecaptcha not ready after script load'))
+        }
+      }, 5000)
+    }
+    
+    script.onerror = () => {
+      recaptchaLoadPromise = null
+      reject(new Error('Failed to load reCAPTCHA script'))
+    }
+    
     document.head.appendChild(script)
   })
+
+  return recaptchaLoadPromise
 }
 
 /**
